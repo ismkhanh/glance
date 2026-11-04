@@ -189,7 +189,7 @@ The tests check the code around the model. The evals check what the agents thems
 
 ```bash
 cd brain && npm test && npm run eval:replay   # 71 tests, then the recorded evals: no Figma, no key, no network
-cd .. && swift test                           # 20 tests of the app
+cd .. && swift test                           # 21 tests of the app
 ```
 
 Latest live run (Muse Spark 1.3, 3 trials per case, 4 Nov 2026; full report in
@@ -226,7 +226,7 @@ The tests cover:
   limit and concurrency cap; parallel tasks, updates while a task runs, questions, pause, edit, cancel, undo and the
   scope guard; what happens when Muse misbehaves (unknown tools, bad colors, tool calls written as text, a plugin that
   stops answering); and an end-to-end run over real sockets.
-- **The app (20 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
+- **The app (21 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
   written; reading Muse's answers; and the agent loop with a scripted Muse. A declined command is never typed, a "no"
   stops the rest of the plan, and the loop is bounded.
 

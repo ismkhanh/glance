@@ -11,6 +11,7 @@ final class BrainLink: NSObject, @unchecked Sendable, URLSessionWebSocketDelegat
     var onConnection: ((Bool) -> Void)?
 
     private let token = UUID().uuidString
+    private let museKey: String?
     private let lock = NSLock()
     private var session: URLSession?
     private var socket: URLSessionWebSocketTask?
@@ -19,6 +20,12 @@ final class BrainLink: NSObject, @unchecked Sendable, URLSessionWebSocketDelegat
     private var stopped = false
     private var warnedNoBrain = false
     private var restarts: [Date] = []
+
+    /// `museKey` is the key the app found; the brain gets it too, so it works wherever brain/ is.
+    init(museKey: String?) {
+        self.museKey = museKey
+        super.init()
+    }
 
     var connected: Bool {
         lock.lock()
@@ -64,6 +71,16 @@ final class BrainLink: NSObject, @unchecked Sendable, URLSessionWebSocketDelegat
         return candidates.first { FileManager.default.fileExists(atPath: $0 + "/src/main.js") }
     }
 
+    /// The brain's environment: the app's own, plus how to reach the app, and the Muse key unless one is set already.
+    static func environment(_ base: [String: String], token: String, museKey: String?) -> [String: String] {
+        var env = base
+        env["GLANCE_TOKEN"] = token
+        env["GLANCE_PORT"] = String(BrainLink.port)
+        env["GLANCE_PARENT_PID"] = String(ProcessInfo.processInfo.processIdentifier)
+        if let key = museKey, (env["MUSE_API_KEY"] ?? "").isEmpty { env["MUSE_API_KEY"] = key }
+        return env
+    }
+
     private func launchBrain() {
         guard let dir = brainDirectory() else {
             print("Glance brain not found (expected ./brain/src/main.js). Figma commands need it; other apps still work.")
@@ -77,11 +94,7 @@ final class BrainLink: NSObject, @unchecked Sendable, URLSessionWebSocketDelegat
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         p.arguments = ["node", dir + "/src/main.js"]
         p.currentDirectoryURL = URL(fileURLWithPath: dir)
-        var env = ProcessInfo.processInfo.environment
-        env["GLANCE_TOKEN"] = token
-        env["GLANCE_PORT"] = String(BrainLink.port)
-        env["GLANCE_PARENT_PID"] = String(ProcessInfo.processInfo.processIdentifier)
-        p.environment = env
+        p.environment = BrainLink.environment(ProcessInfo.processInfo.environment, token: token, museKey: museKey)
         // If the brain stops on its own (a crash), start it again; the app reconnects by itself. Exit code 0 means
         // another brain already had the port, which is fine. More than 5 restarts in a minute: give up and say so.
         p.terminationHandler = { [weak self] proc in

@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpMenu()
 
         // The brain (orchestrator + parallel workers + reviewer) for Figma, and its tooltips, toasts and mascot.
-        let brain = BrainLink()
+        let brain = BrainLink(museKey: key)
         let tasksUI = TasksUI()
         self.brain = brain
         self.tasksUI = tasksUI

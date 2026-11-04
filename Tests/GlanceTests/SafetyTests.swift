@@ -78,6 +78,15 @@ import Testing
         #expect(GlanceMain.museKey(environment: [:], envFile: file.path + ".missing") == nil)
     }
 
+    @Test("The brain gets the app's key, so it works from any folder; a key already set is kept")
+    func brainGetsTheKey() {
+        let env = BrainLink.environment(["PATH": "/usr/bin"], token: "t", museKey: "found")
+        #expect(env["MUSE_API_KEY"] == "found")
+        #expect(env["GLANCE_TOKEN"] == "t" && env["PATH"] == "/usr/bin")
+        #expect(BrainLink.environment(["MUSE_API_KEY": "mine"], token: "t", museKey: "found")["MUSE_API_KEY"] == "mine")
+        #expect(BrainLink.environment([:], token: "t", museKey: nil)["MUSE_API_KEY"] == nil)
+    }
+
     @Test("Tool calls and text are read the same way as the brain's client")
     func readsMuseResponses() {
         let response: [String: Any] = ["output": [
