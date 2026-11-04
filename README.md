@@ -85,7 +85,7 @@ git clone https://github.com/seniormobiledev/glance.git
 cd glance
 cp .env.example .env              # then paste your key after MUSE_API_KEY=
 (cd brain && npm ci)              # the brain's one dependency (ws)
-swift run -c release Glance --say # --say: hear the replies
+swift run -c release Glance       # add --say to hear the replies
 ```
 
 The first build takes about a minute. A **◉ Glance** item appears in the menu bar. Keep the terminal open: it shows the
