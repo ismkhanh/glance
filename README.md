@@ -208,7 +208,7 @@ fails is marked Failed with the reason. Cancel and Undo put the layer back exact
 | `--say` | off | Read results aloud from the start (toggle later in the task list) |
 | `--hey-glance` | off | Listen for "Hey Glance" from the start (also in the ◉ Glance menu) |
 | `--talk-key <key>` | `left-option` | The key you hold to talk: `right-option`, `right-command`, `right-control` or `fn` |
-| `--gaze <port>` | off | Experimental: takes gaze points `{"x": 0…1, "y": 0…1}` over UDP from an eye tracker or headset, and moves the pointer when your gaze settles somewhere new. Not yet tried with a headset |
+| `--gaze <port>` | off | Takes gaze points `{"x": 0…1, "y": 0…1}` over UDP (from [Glance Gaze](#glance-gaze-meta-quest-pro) or any tracker), and moves the pointer when your gaze settles somewhere new |
 | `MUSE_API_KEY` | from `.env` | The Meta Model API key (never logged or recorded) |
 | `GLANCE_MUSE_REVIEW` | on | `0` turns off Muse's second-opinion review (the rules alone let wrong sizes and texts through; see the evals) |
 | `GLANCE_BRAIN_DIR` | `./brain` | Where the brain is, if you run Glance from another folder |
@@ -268,6 +268,19 @@ The tests cover:
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the brain's tests, the replayed evals and the app's tests
 on every push.
 
+## Glance Gaze (Meta Quest Pro)
+
+Glance follows the pointer, so anything that moves the pointer can aim it. Glance Gaze ([quest/](quest/glance-gaze/README.md))
+is a Quest Pro app (Godot 4.7.2 + Meta's OpenXR vendor plugin, passthrough on) that turns where your eyes look on the
+Mac's screen into pointer movement. Calibrate once by touching three screen corners with the controller, then look at
+a window, hold Option and talk.
+
+- Mac side: `swift run -c release Glance --gaze 47810` listens for the gaze points, smooths them and moves the pointer
+  only when your gaze settles somewhere new (`Sources/Glance/GazeInput.swift`).
+- Headset side: OpenXR `XR_EXT_eye_gaze_interaction` gives the gaze ray, and it meets the calibrated screen plane 60
+  times a second (`quest/glance-gaze/gaze.gd`). Build and install steps are in
+  [quest/glance-gaze/README.md](quest/glance-gaze/README.md).
+
 ## Experiments
 
 **Gaze test** (`swift run -c release GazeTest`): can the built-in webcam tell which window you are looking at? Apple
@@ -311,6 +324,7 @@ in `~/MetaAICompetition/demo-shop`, which is not in this repo.
 | `brain/` | The Figma brain: orchestrator, workers, reviewer, Muse client (`src/`), tests (`test/`), evals (`evals/`) |
 | `figma-plugin/` | Glance Bridge, the Figma plugin that reads and changes layers for the brain |
 | `Tests/GlanceTests/` | The app's tests and its live terminal evals |
+| `quest/` | Glance Gaze, the Quest Pro eye-gaze app |
 | `Sources/GazeTest/` | The webcam gaze experiment |
 | `demo/` | The demo video's scripts, scenes and Remotion project |
 

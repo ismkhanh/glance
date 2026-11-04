@@ -1,0 +1,60 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://gaze.gd" id="1_gaze"]
+
+[sub_resource type="Environment" id="Environment_pt"]
+background_mode = 1
+background_color = Color(0, 0, 0, 0)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_dot"]
+radius = 0.008
+height = 0.016
+
+[sub_resource type="StandardMaterial3D" id="Material_dot"]
+shading_mode = 0
+albedo_color = Color(0.49, 0.36, 1, 1)
+no_depth_test = true
+
+[sub_resource type="SphereMesh" id="SphereMesh_tip"]
+radius = 0.006
+height = 0.012
+
+[sub_resource type="StandardMaterial3D" id="Material_tip"]
+shading_mode = 0
+albedo_color = Color(0.2, 0.78, 0.35, 1)
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_gaze")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_pt")
+
+[node name="XROrigin3D" type="XROrigin3D" parent="."]
+
+[node name="XRCamera3D" type="XRCamera3D" parent="XROrigin3D"]
+
+[node name="Help" type="Label3D" parent="XROrigin3D/XRCamera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.18, -0.6)
+pixel_size = 0.0006
+no_depth_test = true
+modulate = Color(0.96, 0.95, 1, 1)
+outline_size = 8
+text = "Starting…"
+font_size = 40
+width = 900.0
+autowrap_mode = 3
+
+[node name="RightController" type="XRController3D" parent="XROrigin3D"]
+tracker = &"right_hand"
+pose = &"aim"
+
+[node name="Tip" type="MeshInstance3D" parent="XROrigin3D/RightController"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.03)
+mesh = SubResource("SphereMesh_tip")
+surface_material_override/0 = SubResource("Material_tip")
+
+[node name="Dot" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_dot")
+surface_material_override/0 = SubResource("Material_dot")

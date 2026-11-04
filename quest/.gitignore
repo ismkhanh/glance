@@ -1,0 +1,7 @@
+# Godot editor, export templates and the Android SDK pieces (see glance-gaze/README.md), and build output
+tools/
+builds/
+glance-gaze/.godot/
+glance-gaze/android/
+# Godot OpenXR Vendors 5.1.0: install it into glance-gaze/addons/ (see glance-gaze/README.md)
+glance-gaze/addons/godotopenxrvendors/
