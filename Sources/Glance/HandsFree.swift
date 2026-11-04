@@ -3,7 +3,8 @@ import Foundation
 
 // Hands-free: say "Hey Glance" once, then talk to any window by pointing at it, without holding a key. Each thing
 // you say is a command for the window under the pointer when you start saying it, exactly as if you held the talk
-// key while you spoke. The session ends with Esc, "thanks, Glance", or 30 s without speech.
+// key while you spoke. The session ends with Esc, "thanks, Glance", or when 10 s pass without a command: from
+// "Hey Glance", or from the last command that ran. Talk and noise that run nothing do not keep it on.
 //
 // While Glance waits for "Hey Glance", a voice detector on the Mac finds speech, and only speech goes to Muse Voice
 // Transcribe: at most its first 2 s until its words show it starts with "Hey Glance". Glance stops sending as soon
@@ -293,6 +294,8 @@ protocol HandsFreeHost: AnyObject, Sendable {
     func transcribe(_ feed: AudioFeed, onPartial: @escaping (String) -> Void) -> Transcription?
     func runTyped(_ command: String, at: Attention?) async
     var isSpeaking: Bool { get }
+    /// A yes/no question waits for its answer (the session stays on for it).
+    var isAsking: Bool { get }
 }
 
 /// Listens for "Hey Glance", then runs the hands-free session. One microphone for everything: while the talk key
@@ -334,8 +337,10 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
     private var preroll: [Data] = []         // the last 400 ms, so a command keeps its first syllable
     private var running = false
     private var active = false
-    private var idleSeconds = 30.0
-    private var lastSpeech = Date()
+    private var idleSeconds = 10.0
+    private var lastCommand = Date()         // the session's start, or its last command that ran
+    private var awaiting = 0                 // commands said whose words are not back from Glance yet
+    private var awaitingSince = Date()
     private var current: Utterance?          // being said now
     private var checking: Utterance?         // finished; its transcript says whether it was "Hey Glance"
     private var held: [Utterance] = []       // said meanwhile, kept on the Mac until then
@@ -350,7 +355,7 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
     var isRunning: Bool { queue.sync { running } }
     var isActive: Bool { queue.sync { active } }
 
-    /// Seconds without speech that end a session.
+    /// Seconds without a command that end a session.
     var idleTimeout: Double {
         get { queue.sync { idleSeconds } }
         set { queue.sync { idleSeconds = newValue } }
@@ -420,7 +425,7 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         queue.sync {
             guard borrowed != nil else { return false }
             borrowed = nil
-            if active { lastSpeech = Date() }
+            if active { lastCommand = Date() }      // a command with the talk key counts too
             keys.async { self.host.keyUp() }
             return true
         }
@@ -438,6 +443,15 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         let (woke, rest) = WakePhrase.split(text)
         if woke { return rest.isEmpty ? nil : rest }
         return text
+    }
+
+    /// Glance has the words of a command said in a session: `ran` if they ran as a command or answered a question.
+    /// Words that ran nothing (noise, talk Glance couldn't use) don't keep the session on.
+    func commandDone(ran: Bool) {
+        queue.async {
+            self.awaiting = max(0, self.awaiting - 1)
+            if ran && self.active { self.lastCommand = Date() }
+        }
     }
 
     /// Waits until what hands-free has heard so far has been handled, and its key presses have reached Glance
@@ -520,8 +534,10 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         let short = Double(u.frames - vad.endFrames + vad.startFrames) * VoiceActivity.frameSeconds < 0.3
         switch u.kind {
         case .command:
-            lastSpeech = Date()
-            if !short { presence.gotIt() }
+            if !short {
+                presence.gotIt()
+                expectWords()
+            }
             keys.async { short ? self.host.cancelHeld() : self.host.keyUp() }
         case .wake(_, let transcription):
             if short {
@@ -598,6 +614,7 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
             } else if !rest.isEmpty {
                 // "Hey Glance, make this red" in one breath: the rest is a command for where you pointed.
                 let at = u.at
+                lastCommand = Date()
                 Task.detached { await self.host.runTyped(rest, at: at) }
             }
         }
@@ -625,10 +642,18 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         for f in u.audio { feed.push(f) }
         u.audio = []
         u.kind = .command(feed)
-        lastSpeech = Date()
         let at = u.at
         keys.async { self.host.keyDown(feed: feed, at: at) }
-        if u.ended { keys.async { self.host.keyUp() } }
+        if u.ended {
+            expectWords()
+            keys.async { self.host.keyUp() }
+        }
+    }
+
+    /// A command was said to its end; its words are on their way (`commandDone` brings them).
+    private func expectWords() {
+        awaiting += 1
+        awaitingSince = Date()
     }
 
     private func drop(_ u: Utterance) {
@@ -659,7 +684,8 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
     private func startSession() {
         guard !active else { return }
         active = true
-        lastSpeech = Date()
+        lastCommand = Date()
+        awaiting = 0
         vad.longestFrames = 1500                 // 30 s: a long command is not cut in two
         presence.set(.session, true)
         onSessionChange?(true)
@@ -667,10 +693,16 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         Glance.prompt()
     }
 
+    /// Ends the session 10 s after its last command, but not while you talk, while a command's words are on their
+    /// way, or while a question waits for yes or no.
     private func checkIdle() {
-        guard active, current == nil, checking == nil, borrowed == nil,
-              Date().timeIntervalSince(lastSpeech) > idleSeconds else { return }
-        endSession("\(Int(idleSeconds)) s without speech")
+        guard active, current == nil, checking == nil, borrowed == nil, !host.isAsking else { return }
+        if awaiting > 0 {
+            guard Date().timeIntervalSince(awaitingSince) > 15 else { return }
+            awaiting = 0                         // the words never came back (no window there, a voice error)
+        }
+        guard Date().timeIntervalSince(lastCommand) > idleSeconds else { return }
+        endSession("\(Int(idleSeconds)) s without a command")
     }
 
     private func endSession(_ why: String?) {

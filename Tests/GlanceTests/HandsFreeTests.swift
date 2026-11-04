@@ -312,6 +312,7 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
     private var pointed: [String] = []
     private var looks = 0
     var speaking = false
+    var asking = false
 
     init(_ said: [Said] = []) {
         self.said = said
@@ -364,6 +365,7 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
     }
 
     var isSpeaking: Bool { lock.lock(); defer { lock.unlock() }; return speaking }
+    var isAsking: Bool { lock.lock(); defer { lock.unlock() }; return asking }
 
     func transcribe(_ feed: AudioFeed, onPartial: @escaping (String) -> Void) -> Transcription? {
         record("transcribing")
@@ -563,11 +565,49 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         #expect(!handsFree.isActive)
     }
 
-    @Test("A session ends by itself after a while without speech")
+    @Test("With no command after “Hey Glance”, the session ends by itself (10 s; 0.3 s here)")
     func idle() async throws {
         let host = FakeHost([Said(text: "Hey Glance.")])
         let handsFree = try await awake(host, quietPresence())
+        #expect(handsFree.idleTimeout == 10)
         handsFree.idleTimeout = 0.3
+        #expect(await eventually { !handsFree.isActive })
+    }
+
+    @Test("A command that ran keeps the session on for the timeout again; the session waits for its words meanwhile")
+    func commandKeepsItOn() async throws {
+        let host = FakeHost([Said(text: "Hey Glance.")])
+        let handsFree = try await awake(host, quietPresence())
+        handsFree.idleTimeout = 0.5
+        try say(handsFree, "not-for-glance")
+        try await Task.sleep(nanoseconds: 800_000_000)
+        #expect(handsFree.isActive, "ended while the command's words were on their way")
+        handsFree.commandDone(ran: true)
+        try await Task.sleep(nanoseconds: 250_000_000)
+        #expect(handsFree.isActive, "ended right after a command ran")
+        #expect(await eventually { !handsFree.isActive })
+    }
+
+    @Test("Words that ran nothing (noise, talk Glance couldn't use) don't keep the session on")
+    func nothingRanEndsIt() async throws {
+        let host = FakeHost([Said(text: "Hey Glance.")])
+        let handsFree = try await awake(host, quietPresence())
+        handsFree.idleTimeout = 0.5
+        try say(handsFree, "not-for-glance")
+        try await Task.sleep(nanoseconds: 800_000_000)
+        handsFree.commandDone(ran: false)
+        #expect(await eventually(0.6) { !handsFree.isActive })
+    }
+
+    @Test("A question waiting for yes or no keeps the session on")
+    func questionKeepsItOn() async throws {
+        let host = FakeHost([Said(text: "Hey Glance.")])
+        let handsFree = try await awake(host, quietPresence())
+        host.asking = true
+        handsFree.idleTimeout = 0.3
+        try await Task.sleep(nanoseconds: 800_000_000)
+        #expect(handsFree.isActive)
+        host.asking = false
         #expect(await eventually { !handsFree.isActive })
     }
 

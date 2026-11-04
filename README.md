@@ -148,7 +148,8 @@ Start with `--hey-glance`, or turn on ◉ Glance > "Listen for “Hey Glance”"
   it, exactly as if you held ⌥ while you spoke. When you stop, a soft pop says Glance has it: point at another window
   and keep talking, no "Hey Glance" again. The glow shows where your next words will go.
 - "Hey Glance, make this button green" in one breath starts the session and runs the command.
-- **Esc**, "thanks, Glance", "stop listening" or 30 s without speech ends the session: the eye closes and you hear the
+- **Esc**, "thanks, Glance" or "stop listening" ends the session, and so do 10 s without a command (after "Hey
+  Glance", or after the last command that ran; a yes/no question keeps it on). The eye closes and you hear the
   closing sound. Answer a yes/no question with just the answer ("yes, go ahead", "no"): other talk in the room
   doesn't count as one.
 
@@ -215,7 +216,7 @@ The tests check the code around the model. The evals check what the agents thems
 
 ```bash
 cd brain && npm test && npm run eval:replay   # 71 tests, then the recorded evals: no Figma, no key, no network
-cd .. && swift test                           # 46 tests of the app
+cd .. && swift test                           # 49 tests of the app
 ```
 
 Latest live run (Muse Spark 1.3, 3 trials per case, 4 Nov 2026; full report in
@@ -253,7 +254,7 @@ The tests cover:
   limit and concurrency cap; parallel tasks, updates while a task runs, questions, pause, edit, cancel, undo and the
   scope guard; what happens when Muse misbehaves (unknown tools, bad colors, tool calls written as text, a plugin that
   stops answering); and an end-to-end run over real sockets.
-- **The app (46 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
+- **The app (49 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
   written; reading Muse's answers; and the agent loop with a scripted Muse. A declined command is never typed, a "no"
   stops the rest of the plan, and the loop is bounded. Hands-free: the voice detector on spoken clips in a quiet room
   and next to a fan, the wake and goodbye phrases, and a whole session (wake, commands, Esc, silence, the talk key,

@@ -119,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let handsFree = HandsFree(host: glance)
         self.handsFree = handsFree
         glance.transform = { [weak handsFree] text in handsFree.map { $0.filter(text) } ?? text }
+        glance.onVoiceCommand = { [weak handsFree] ran in handsFree?.commandDone(ran: ran) }
         let escapeKey = EscapeKey { [weak handsFree] in handsFree?.escape() }
         self.escapeKey = escapeKey
         handsFree.onSessionChange = { on in
@@ -344,7 +345,7 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
     private var keyElement: PointedElement?
     private var keyNearby: [PointedElement] = []
     private var keyAnswering = false
-    private var keyHandsFree = false             // the press was made by voice, in a hands-free session
+    private var keyHandsFree = false             // the press was made by voice, in a hands-free session (not ⌥)
     private var keyDownAt = Date()
     private var pending: PendingAnswer?
     private var speaker: Process?
@@ -355,6 +356,9 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
     /// Every spoken command's words pass through here first (hands-free: "thanks, Glance" ends the session); nil
     /// drops the command. Set once at start.
     var transform: ((String) -> String?)?
+    /// Called once for every press made by voice, when its words are in: true if they ran as a command or answered
+    /// a question (hands-free keeps the session on for 10 s more). Set once at start.
+    var onVoiceCommand: ((Bool) -> Void)?
 
     init(key: String, micAllowed: Bool, speak: Bool, ui: Highlighter, brain: BrainLink?, tips: QuestionTips?) {
         self.key = key
@@ -410,7 +414,7 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         return pending
     }
 
-    private var isAsking: Bool { pendingAnswer != nil }
+    var isAsking: Bool { pendingAnswer != nil }
 
     private func card(_ id: String, _ text: String, near frame: CGRect, hideAfter seconds: Double? = nil) {
         DispatchQueue.main.async { self.cards.show(id, text, near: frame, hideAfter: seconds) }
@@ -429,12 +433,14 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         return attention
     }
 
-    /// The talk key went down, or hands-free heard you start talking: then `feed` brings the audio, and `pointed`
-    /// is what was under the pointer as you started.
+    /// The talk key went down, or hands-free heard you start talking. `feed` brings the audio when hands-free has the
+    /// microphone; a press made by voice also brings `pointed`, what was under the pointer as you started.
     func keyDown(feed: AudioFeed? = nil, at pointed: Attention? = nil) {
         guard micAllowed else { return }
+        let byVoice = pointed != nil
         lock.lock()
         keyHeld = true
+        keyHandsFree = byVoice
         lock.unlock()
         let answering = isAsking
         let attention = pointed ?? AttentionBox.shared.get()
@@ -444,7 +450,7 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
             let tip = tips?.taskUnderPointer()
             let window = attention.window ?? WindowLocator.windowUnderPointer()
             if tip != nil || window.map(FigmaPointer.isFigma) == true {
-                startBrainCommand(window: window, answerTo: tip, feed: feed)
+                startBrainCommand(window: window, answerTo: tip, feed: feed, byVoice: byVoice)
                 return
             }
         }
@@ -481,7 +487,6 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         keyElement = answering ? keyElement : element
         keyNearby = answering ? keyNearby : attention.nearby
         keyAnswering = answering
-        keyHandsFree = feed != nil
         keyDownAt = Date()
         lock.unlock()
 
@@ -501,12 +506,12 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         }
     }
 
-    private func startBrainCommand(window: TargetWindow?, answerTo: String?, feed: AudioFeed?) {
+    private func startBrainCommand(window: TargetWindow?, answerTo: String?, feed: AudioFeed?, byVoice: Bool) {
         stopSpeaking()
         let command = BrainCommand(id: UUID().uuidString, answerTo: answerTo)
         // Hands-free hears every noise in the room, so it picks the layer once there are words: a cough selects
         // nothing.
-        let pointLater = feed != nil && answerTo == nil
+        let pointLater = byVoice && answerTo == nil
         if !pointLater { point(command, window) }
 
         let session = takeVoice()
@@ -527,7 +532,6 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         keySession = session
         keyBrain = command
         keyTarget = window
-        keyHandsFree = feed != nil
         keyDownAt = Date()
         lock.unlock()
         if let w = window { onMain { $0.lock(w, nil) } }
@@ -570,6 +574,7 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
             } catch {
                 print("\nVoice error: \(error)")
                 self.onMain { $0.finish("Sorry, I didn't catch that.") }
+                self.voiceDone(false, handsFree)
                 Glance.prompt()
                 return
             }
@@ -579,9 +584,11 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
             }
             if said.isEmpty {
                 self.onMain { $0.finish(nil) }
+                self.voiceDone(false, handsFree)
                 Glance.prompt()
                 return
             }
+            self.voiceDone(true, handsFree)
             self.point(command, window)            // hands-free: no partial words came, so the layer is picked now
             var msg: [String: Any] = ["type": "command", "id": command.id, "text": said]
             if let task = command.answerTo { msg["answerTo"] = task }
@@ -613,7 +620,10 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         let held = Date().timeIntervalSince(keyDownAt)
         keySession = nil
         lock.unlock()
-        guard let session = heldSession, let target = heldTarget else { return }
+        guard let session = heldSession, let target = heldTarget else {
+            voiceDone(false, handsFree)          // nothing was listening (no window under the pointer)
+            return
+        }
 
         Task.detached {
             // A hands-free press is as long as the speech, which is handed over all at once if it waited.
@@ -633,11 +643,12 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
             } catch {
                 print("\nVoice error: \(error)")
                 if !answering { self.onMain { $0.finish("Sorry, I didn't catch that.") } }
+                self.voiceDone(false, handsFree)
                 Glance.prompt()
                 return
             }
             if answering {
-                self.answerByVoice(text, strict: handsFree)
+                self.voiceDone(self.answerByVoice(text, strict: handsFree), handsFree)
                 return
             }
             if !text.trimmingCharacters(in: .whitespaces).isEmpty, let transform = self.transform {
@@ -645,9 +656,11 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
             }
             if text.trimmingCharacters(in: .whitespaces).isEmpty {
                 self.onMain { $0.finish(nil) }
+                self.voiceDone(false, handsFree)
                 Glance.prompt()
                 return
             }
+            self.voiceDone(true, handsFree)
             // The command is now a task with its own card; the glow is free for the next window at once.
             let id = Glance.newTaskId()
             self.tasks.add(id, title: text, window: target)
@@ -720,21 +733,26 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         return yes == no ? nil : yes
     }
 
-    private func answerByVoice(_ text: String, strict: Bool) {
+    /// Returns whether it answered the question.
+    private func answerByVoice(_ text: String, strict: Bool) -> Bool {
         guard let yes = Glance.answer(text, strict: strict) else {
             if strict {
                 // Probably said to someone else: the question stays as it was.
                 if let p = pendingAnswer { card(p.taskId, p.question, near: p.frame) }
                 print("\n(still waiting for yes or no; heard \"\(text)\")")
                 Glance.prompt()
-                return
+                return false
             }
             print("(say yes or no)")
             if let p = pendingAnswer { card(p.taskId, "I didn't get a yes or no.\nHold the talk key and say yes or no.", near: p.frame) }
             Glance.prompt()
-            return
+            return false
         }
-        _ = answerPending(yes ? "y" : "n")
+        return answerPending(yes ? "y" : "n")
+    }
+
+    private func voiceDone(_ ran: Bool, _ byVoice: Bool) {
+        if byVoice { onVoiceCommand?(ran) }
     }
 
     /// Waits for a yes or no for one task: by voice (hold the talk key anywhere) or typed in the terminal.

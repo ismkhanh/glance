@@ -6,7 +6,7 @@ cheapest to the most real:
 
 | Level | What it proves | Muse | When | Command |
 | --- | --- | --- | --- | --- |
-| Tests: 71 in brain/, 46 in the app | The code around the model: routing, the scope guard, undo, retries and rate limits, confirmation rules, secret masking, the agent loop | A scripted stand-in | Every change (6 s) | `npm test` · `swift test` |
+| Tests: 71 in brain/, 49 in the app | The code around the model: routing, the scope guard, undo, retries and rate limits, confirmation rules, secret masking, the agent loop | A scripted stand-in | Every change (6 s) | `npm test` · `swift test` |
 | Agent evals, replayed | The recorded behaviour still holds after a change. The same prompts give the same outcome, and a changed prompt is caught | The recording ([cassette.json](cassette.json)) | CI (1 s) | `npm run eval:replay` |
 | Agent evals, live | What the real model does with our prompts and tools, 3 trials per case | Muse Spark 1.3, Muse Image 1.0 | Before a release (~5 min) | `npm run eval` · `GLANCE_LIVE_EVAL=1 swift test --filter AgentLiveEvals` |
 
