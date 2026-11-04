@@ -9,6 +9,9 @@ Glance removes the click. Point at a window, hold ⌥ (or say "Hey Glance" once)
 where, your words say what, and Muse acts inside that window. Every command is its own task, so you point at the next
 window and talk while the first one works.
 
+[![Glance demo video (3 min): click to play](docs/demo-poster.jpg)](docs/glance-demo.mp4)
+<sub>The demo video (3 min, recorded live on a Mac): click to play, or [open it here](docs/glance-demo.mp4).</sub>
+
 ![Four terminals, four spoken commands, all running at once](docs/terminals.gif)
 <sub>Four terminals, four spoken commands, all running at once (from the demo video, 2× speed).</sub>
 
@@ -21,7 +24,7 @@ Glance grows into other apps and use cases.
 <sub>In Figma: a new heading, a photo painted by Muse Image, and a green button, each from one spoken command (2× speed).</sub>
 
 Built for the Meta Global AI Developer Hackathon (26 Oct – 4 Nov 2026), indie track.
-**Demo video (3 min): _link added at submission_**
+**Demo video (3 min): [docs/glance-demo.mp4](docs/glance-demo.mp4)**
 
 | Meta model | What it does in Glance |
 | --- | --- |
