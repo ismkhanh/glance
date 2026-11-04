@@ -49,14 +49,11 @@ enum TalkKeyChoice: String, CaseIterable {
     }
 }
 
-/// Watches one key anywhere on the Mac (a listen-only event tap on its own thread) and reports press and release,
-/// and Esc, which ends a hands-free session. Every other key is let through untouched and never looked at.
+/// Watches one key anywhere on the Mac (a listen-only event tap on its own thread) and reports press and release.
 final class TalkKey {
-    private static let escape: Int64 = 53
     private let choice: TalkKeyChoice
     private var onDown: (() -> Void)?
     private var onUp: (() -> Void)?
-    private var onEscape: (() -> Void)?
     private var isDown = false
     private var tap: CFMachPort?
     private let queue = DispatchQueue(label: "glance.talkkey")
@@ -66,14 +63,12 @@ final class TalkKey {
     }
 
     /// Returns false when macOS does not allow watching keys (Input Monitoring is off for the terminal app).
-    func start(onDown: @escaping () -> Void, onUp: @escaping () -> Void, onEscape: (() -> Void)? = nil) -> Bool {
+    func start(onDown: @escaping () -> Void, onUp: @escaping () -> Void) -> Bool {
         self.onDown = onDown
         self.onUp = onUp
-        self.onEscape = onEscape
         if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
 
-        var mask = CGEventMask(1) << CGEventMask(CGEventType.flagsChanged.rawValue)
-        if onEscape != nil { mask |= CGEventMask(1) << CGEventMask(CGEventType.keyDown.rawValue) }
+        let mask = CGEventMask(1) << CGEventMask(CGEventType.flagsChanged.rawValue)
         let me = Unmanaged.passUnretained(self).toOpaque()
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             if let refcon = refcon {
@@ -104,10 +99,6 @@ final class TalkKey {
             if let tap = tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return
         }
-        if type == .keyDown {
-            if event.getIntegerValueField(.keyboardEventKeycode) == TalkKey.escape { queue.async { self.onEscape?() } }
-            return
-        }
         guard type == .flagsChanged, event.getIntegerValueField(.keyboardEventKeycode) == choice.keyCode else { return }
         let down = event.flags.contains(choice.flag)
         if down && !isDown {
@@ -116,6 +107,61 @@ final class TalkKey {
         } else if !down && isDown {
             isDown = false
             queue.async { self.onUp?() }
+        }
+    }
+}
+
+/// Esc anywhere ends a hands-free session. Key presses are watched only while a session is on, and then only to see
+/// whether one was Esc: nothing is kept, and every key goes through untouched. Main thread.
+final class EscapeKey {
+    private static let escape: Int64 = 53
+    private let onEscape: () -> Void
+    private let queue = DispatchQueue(label: "glance.escape")
+    private var tap: CFMachPort?
+    private var source: CFRunLoopSource?
+
+    init(onEscape: @escaping () -> Void) {
+        self.onEscape = onEscape
+    }
+
+    /// Returns false when macOS does not allow watching keys (Input Monitoring is off for the terminal app).
+    @discardableResult
+    func start() -> Bool {
+        guard tap == nil else { return true }
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        let callback: CGEventTapCallBack = { _, type, event, refcon in
+            if let refcon = refcon {
+                Unmanaged<EscapeKey>.fromOpaque(refcon).takeUnretainedValue().handle(type, event)
+            }
+            return Unmanaged.passUnretained(event)
+        }
+        guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
+                                          eventsOfInterest: CGEventMask(1) << CGEventMask(CGEventType.keyDown.rawValue),
+                                          callback: callback, userInfo: me) else { return false }
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        self.tap = tap
+        self.source = source
+        return true
+    }
+
+    func stop() {
+        guard let tap = tap else { return }
+        CGEvent.tapEnable(tap: tap, enable: false)
+        if let source = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+        CFMachPortInvalidate(tap)
+        self.tap = nil
+        source = nil
+    }
+
+    private func handle(_ type: CGEventType, _ event: CGEvent) {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return
+        }
+        if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == EscapeKey.escape {
+            queue.async { self.onEscape() }
         }
     }
 }

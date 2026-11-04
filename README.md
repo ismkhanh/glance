@@ -147,12 +147,16 @@ Start with `--hey-glance`, or turn on ◉ Glance > "Listen for “Hey Glance”"
   it, exactly as if you held ⌥ while you spoke. Point at another window and keep talking: no "Hey Glance" again.
 - "Hey Glance, make this button green" in one breath starts the session and runs the command.
 - **Esc**, "thanks, Glance", "stop listening" or 30 s without speech ends the session: the eye closes and you hear the
-  closing sound. Yes/no questions are answered by just saying yes or no.
+  closing sound. Answer a yes/no question with just the answer ("yes, go ahead", "no"): other talk in the room
+  doesn't count as one.
 
 How it listens: a voice detector on the Mac finds where speech starts and stops, learning the room's own noise level.
-While Glance waits for "Hey Glance", only speech goes to Muse Voice Transcribe, and Glance stops sending as soon as the
-first two words aren't "Hey Glance"; it drops what it heard. Glance doesn't listen to itself while it reads a result
-aloud. Holding ⌥ still works during a session, and uses the same microphone.
+While Glance waits for "Hey Glance", only speech goes to Muse Voice Transcribe, and of each thing said only its first
+2 s until its words show it starts with "Hey Glance". Glance stops sending as soon as the first words aren't "Hey
+Glance" (or are "hey, glance at this"), and drops what it heard; coughs and clicks are dropped too. A command said
+right after "Hey Glance", before its transcript is back, waits on the Mac and then runs. Glance doesn't listen to its
+own voice or sounds, and watches for Esc only during a session. Holding ⌥ still works during a session, and uses the
+same microphone.
 
 ## Figma: parallel tasks with an orchestrator and a reviewer
 
@@ -209,7 +213,7 @@ The tests check the code around the model. The evals check what the agents thems
 
 ```bash
 cd brain && npm test && npm run eval:replay   # 71 tests, then the recorded evals: no Figma, no key, no network
-cd .. && swift test                           # 37 tests of the app
+cd .. && swift test                           # 46 tests of the app
 ```
 
 Latest live run (Muse Spark 1.3, 3 trials per case, 4 Nov 2026; full report in
@@ -247,11 +251,12 @@ The tests cover:
   limit and concurrency cap; parallel tasks, updates while a task runs, questions, pause, edit, cancel, undo and the
   scope guard; what happens when Muse misbehaves (unknown tools, bad colors, tool calls written as text, a plugin that
   stops answering); and an end-to-end run over real sockets.
-- **The app (37 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
+- **The app (46 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
   written; reading Muse's answers; and the agent loop with a scripted Muse. A declined command is never typed, a "no"
   stops the rest of the plan, and the loop is bounded. Hands-free: the voice detector on spoken clips in a quiet room
   and next to a fan, the wake and goodbye phrases, and a whole session (wake, commands, Esc, silence, the talk key,
-  not listening to itself).
+  not listening to itself); that at most 2 s leave the Mac before "Hey Glance" is confirmed, that a command said
+  straight after it is kept and run, that coughs are dropped, and that only a clear yes or no answers a question.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the brain's tests, the replayed evals and the app's tests
 on every push.

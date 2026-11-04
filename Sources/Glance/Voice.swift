@@ -38,6 +38,12 @@ final class MicCapture {
     private let engine = AVAudioEngine()
     private let outFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: true)!
     private var clipTimer: DispatchSourceTimer?
+    private let demoClips: Bool
+
+    /// `demoClips: false` always uses the microphone, even when a demo clip waits (the clips are for the talk key).
+    init(demoClips: Bool = true) {
+        self.demoClips = demoClips
+    }
 
     static func requestAccess() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -53,7 +59,7 @@ final class MicCapture {
     }
 
     func start(onData: @escaping (Data) -> Void) throws {
-        if let clip = DemoVoice.takeClip() {
+        if demoClips, let clip = DemoVoice.takeClip() {
             startClip(clip, onData: onData)
             return
         }
@@ -129,13 +135,16 @@ final class MicCapture {
 /// and sent as soon as it is.
 ///
 /// The service closes a session whose audio falls behind real time, so audio is paced by the clock:
-/// a pacer tops up silence until "audio sent" = "time passed" + a small lead (the service allows up to 5 s ahead).
+/// a pacer tops up silence until "audio sent" = "time passed" + a small lead. Audio is never sent more than 4 s
+/// ahead either (the service allows 5): a long wait for the session, or a hands-free command handed over all at
+/// once, goes out at the pace the service takes.
 final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
     var onPartial: ((String) -> Void)?
     let openedAt = Date()
 
     private static let rate = 24_000        // samples per second
     private static let idleLead = 0.3       // seconds of audio kept ahead of real time while waiting
+    private static let mostAhead = 4.0      // seconds of audio sent ahead of real time at most
 
     private let key: String
     private let queue = DispatchQueue(label: "glance.voice")
@@ -145,7 +154,8 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
     private var sentSamples = 0
     private var talking = false
     private var endRequested = false
-    private var pending: [Data] = []
+    private var endSent = false
+    private var backlog: [Data] = []        // audio not sent yet: the session is not ready, or it would be too far ahead
     private var pacer: DispatchSourceTimer?
     private var waiter: CheckedContinuation<String, Error>?
     private var failure: String?
@@ -201,11 +211,8 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
             guard let self = self else { return }
             self.queue.async {
                 if self.done || self.endRequested { return }
-                if self.ready {
-                    self.send(data)
-                } else {
-                    self.pending.append(data)
-                }
+                self.backlog.append(data)
+                self.drain()
             }
         }
         if let feed = feed {
@@ -235,7 +242,7 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
                 }
                 self.waiter = cont
                 self.endRequested = true
-                if self.ready { self.sendEnd() }
+                self.drain()
                 self.queue.asyncAfter(deadline: .now() + timeout) {
                     self.fail("No transcript after \(Int(timeout)) s.")
                 }
@@ -279,10 +286,8 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
         if type.isEmpty, json["sessionId"] != nil {
             ready = true
             readyAt = now()
-            for chunk in pending { send(chunk) }
-            pending = []
+            drain()
             startPacer()
-            if endRequested { sendEnd() }
             return
         }
         switch type {
@@ -300,8 +305,19 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
         }
     }
 
-    private func sendEnd() {
-        socket?.send(.string("{\"type\":\"endStream\"}")) { _ in }
+    /// Sends the audio that is due (no more than 4 s ahead of real time), then the end of the stream once you
+    /// stopped talking and all of it is out.
+    private func drain() {
+        guard ready, !done else { return }
+        let allowed = Int((now() - readyAt + VoiceSession.mostAhead) * Double(VoiceSession.rate))
+        while let chunk = backlog.first, sentSamples + chunk.count / 2 <= allowed {
+            send(chunk)
+            backlog.removeFirst()
+        }
+        if endRequested && backlog.isEmpty && !endSent {
+            endSent = true
+            socket?.send(.string("{\"type\":\"endStream\"}")) { _ in }
+        }
     }
 
     /// Every 20 ms: if less audio has been sent than time has passed (plus the lead), send silence to catch up.
@@ -311,7 +327,9 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(20), leeway: .milliseconds(5))
         timer.setEventHandler { [weak self] in
-            guard let self = self, self.ready, !self.done, !self.endRequested else { return }
+            guard let self = self, self.ready, !self.done else { return }
+            self.drain()
+            guard !self.endRequested, self.backlog.isEmpty else { return }
             let lead = self.talking ? 0 : VoiceSession.idleLead
             let due = Int((self.now() - self.readyAt + lead) * Double(VoiceSession.rate))
             let missing = due - self.sentSamples
@@ -339,6 +357,9 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
     }
 
     private func shutDown() {
+        // Closed while someone waits for the transcript (a hands-free check that was dropped): nothing was said.
+        waiter?.resume(throwing: ScriptError(message: "Voice session closed."))
+        waiter = nil
         done = true
         pacer?.cancel()
         pacer = nil

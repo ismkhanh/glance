@@ -67,7 +67,7 @@ enum Clip {
         #expect(events[1].1 >= end + 0.4 && events[1].1 <= end + 1.0, "ended at \(events[1].1) s, speech ends at \(end) s")
     }
 
-    @Test("A quiet room, a click and a short knock are not speech")
+    @Test("A quiet room and a 40 ms click are not speech")
     func ignoresNoise() {
         #expect(Clip.events(Clip.room(seconds: 5)).isEmpty)
         let click = Data(repeating: 0x40, count: VoiceActivity.frameBytes * 2)    // 40 ms
@@ -91,11 +91,18 @@ enum Clip {
         }
     }
 
-    @Test("Glance's own voice is not speech, but it can end speech")
+    @Test("Glance's own voice or sound neither starts speech nor cuts it off")
     func ignoredFrames() {
         var vad = VoiceActivity()
-        for _ in 0..<50 { #expect(vad.ignore() == nil) }
+        for _ in 0..<50 { vad.ignore() }
         #expect(!vad.speaking)
+        for _ in 0..<3 { _ = vad.process(level: -20) }
+        #expect(vad.speaking)
+        for _ in 0..<60 { vad.ignore() }          // the 0.77 s sound and more, while you talk
+        #expect(vad.speaking)
+        var events: [VoiceActivity.Event] = []
+        for _ in 0..<40 { if let e = vad.process(level: -70) { events.append(e) } }
+        #expect(events == [.ended])
     }
 
     @Test("“Hey Glance” is found however speech to text writes it, and the rest is the command",
@@ -108,23 +115,29 @@ enum Clip {
     }
 
     @Test("Talk that only mentions a glance does not wake Glance",
-          arguments: ["Take a glance at the logs", "Hey, can you glance at this?", "Glancing at it now", "Hey there"])
+          arguments: ["Take a glance at the logs", "Hey, can you glance at this?", "Glancing at it now", "Hey there",
+                      "Hey, glance at this", "A glance at the logs would help", "Hey glance over the PR for me"])
     func notWakePhrase(said: String) {
         #expect(!WakePhrase.split(said).woke)
     }
 
-    @Test("Glance stops sending as soon as the first two words can't be “Hey Glance”")
+    @Test("Glance stops sending as soon as the first words can't be “Hey Glance”, and is sure once a command follows")
     func stopsEarly() {
         #expect(WakePhrase.mightStart(""))
         #expect(WakePhrase.mightStart("Hey"))
         #expect(WakePhrase.mightStart("Hey Glance, make"))
         #expect(!WakePhrase.mightStart("Can you"))
         #expect(!WakePhrase.mightStart("Hey can"))
+        #expect(!WakePhrase.mightStart("Hey, glance at"))
+        #expect(WakePhrase.confirms("Hey Glance, make"))
+        #expect(!WakePhrase.confirms("Hey Glance"))           // could still be "Hey, glance at this"
+        #expect(!WakePhrase.confirms("Hey glance at"))
     }
 
     @Test("“Thanks, Glance” and “stop listening” end a session; a command that starts like one does not")
     func goodbyes() {
-        for said in ["Thanks, Glance.", "That's all.", "Stop listening", "thank you", "Bye Glance!"] {
+        for said in ["Thanks, Glance.", "That's all.", "Stop listening", "thank you", "Bye Glance!", "Thanks, Lance.",
+                     "OK thanks Glance", "Great, thank you Glance!", "Glance, go to sleep"] {
             #expect(WakePhrase.isGoodbye(said), "\(said)")
         }
         for said in ["Stop the server", "Thanks Glance, now make it red", "that's all the tests?"] {
@@ -143,6 +156,45 @@ enum Clip {
         feed.detach()
         feed.push(Data([4]))
         #expect(got == [1, 2, 3])
+    }
+
+    @Test("Audio pushed while a session attaches still arrives in order")
+    func feedKeepsOrder() async {
+        let feed = AudioFeed()
+        let pusher = Thread {
+            for i in 0..<20_000 { feed.push(withUnsafeBytes(of: UInt32(i)) { Data($0) }) }
+        }
+        pusher.start()
+        while !pusher.isExecuting && !pusher.isFinished { usleep(100) }
+        usleep(2_000)
+        let got = Got()
+        feed.attach { got.add($0) }
+        while !pusher.isFinished { usleep(1_000) }
+        let values = got.values
+        #expect(!values.isEmpty)
+        #expect(zip(values, values.dropFirst()).allSatisfy { $0 + 1 == $1 }, "out of order")
+    }
+
+    final class Got: @unchecked Sendable {
+        private let lock = NSLock()
+        private var list: [UInt32] = []
+        func add(_ d: Data) { lock.lock(); list.append(d.withUnsafeBytes { $0.load(as: UInt32.self) }); lock.unlock() }
+        var values: [UInt32] { lock.lock(); defer { lock.unlock() }; return list }
+    }
+
+    @Test("Hands-free answers a question only with a clear yes or no; the talk key's answers stay easy",
+          arguments: [("yes", true), ("Yes, go ahead.", true), ("No, don't.", false), ("Go ahead and do it", true),
+                      ("Cancel", false), ("Sure, let's go to lunch.", nil), ("OK", nil), ("Sure", nil),
+                      ("Hmm, that's not right", nil)] as [(String, Bool?)])
+    func answers(said: String, handsFree: Bool?) {
+        #expect(Glance.answer(said, strict: true) == handsFree)
+        if handsFree != nil { #expect(Glance.answer(said, strict: false) == handsFree) }
+    }
+
+    @Test("With the talk key, “sure” and “ok” still answer yes")
+    func keyAnswers() {
+        #expect(Glance.answer("Sure", strict: false) == true)
+        #expect(Glance.answer("OK", strict: false) == true)
     }
 }
 
@@ -207,36 +259,91 @@ struct HandsFreeLiveEvals {
         let (text, _) = try await hear("thanks-glance")
         #expect(WakePhrase.isGoodbye(text), "heard \"\(text)\"")
     }
+
+    @Test("Speech handed over all at once (said while “Hey Glance” was checked) goes out at the service's pace")
+    func handedOverAtOnce() async throws {
+        let key = try #require(GlanceMain.museKey(), "No Muse key: set MUSE_API_KEY")
+        let session = VoiceSession(key: key)
+        session.open()
+        let feed = AudioFeed()
+        let audio = Clip.room(seconds: 0.3) + (try Clip.pcm("hey-glance-command")) + Clip.room(seconds: 0.5)
+            + (try Clip.pcm("not-for-glance")) + Clip.room(seconds: 0.5) + (try Clip.pcm("hey-glance-command"))
+        var offset = 0                            // 7 s at once, more than the service takes ahead of time
+        while offset < audio.count {
+            feed.push(audio.subdata(in: offset..<min(offset + VoiceActivity.frameBytes, audio.count)))
+            offset += VoiceActivity.frameBytes
+        }
+        try session.startTalking(feed: feed)
+        let text = try await session.stopTalking(timeout: 20)
+        print("  handed over at once (\(String(format: "%.1f", Clip.seconds(audio))) s): \"\(text)\"")
+        let lower = text.lowercased()
+        #expect(lower.contains("logs") && lower.components(separatedBy: "green").count == 3, "heard \"\(text)\"")
+    }
 }
 
-/// Stands in for Glance: records the key presses hands-free makes, and answers "Hey Glance" transcriptions with
-/// scripted words.
+/// Stands in for Glance: records the key presses hands-free makes, and answers "Hey Glance" checks with scripted
+/// words, which come in as the audio arrives, as Muse's do.
 final class FakeHost: HandsFreeHost, @unchecked Sendable {
+    /// What one "Hey Glance" check hears: its transcript, the words it has after so many seconds of audio, and how
+    /// long the transcript takes once the speech ended.
+    struct Said {
+        var text: String
+        var partials: [(after: Double, words: String)] = []
+        var delay = 0.0
+    }
+
     final class Heard: Transcription, @unchecked Sendable {
-        let text: String
+        let said: Said
         let host: FakeHost
-        init(_ text: String, host: FakeHost) { self.text = text; self.host = host }
-        func finish() async -> String { host.record("finish"); return text }
+        init(_ said: Said, host: FakeHost) { self.said = said; self.host = host }
+        func finish() async -> String {
+            host.record("finish")
+            if said.delay > 0 { try? await Task.sleep(nanoseconds: UInt64(said.delay * 1e9)) }
+            return said.text
+        }
         func cancel() { host.record("stopped sending") }
     }
 
     private let lock = NSLock()
-    private var said: [(text: String, partials: [String])]
+    private var said: [Said]
     private var entries: [String] = []
     private var received: [Int] = []
+    private var checks: [Int] = []
+    private var pointed: [String] = []
+    private var looks = 0
     var speaking = false
 
-    init(_ said: [(String, [String])] = []) {
-        self.said = said.map { (text: $0.0, partials: $0.1) }
+    init(_ said: [Said] = []) {
+        self.said = said
     }
 
     func record(_ entry: String) { lock.lock(); entries.append(entry); lock.unlock() }
     var log: [String] { lock.lock(); defer { lock.unlock() }; return entries }
     /// Bytes of audio each key press got.
     var audio: [Int] { lock.lock(); defer { lock.unlock() }; return received }
+    /// Bytes of audio each "Hey Glance" check got.
+    var checked: [Int] { lock.lock(); defer { lock.unlock() }; return checks }
+    /// Where each command went: "look 1" is what was under the pointer the first time hands-free looked.
+    var targets: [String] { lock.lock(); defer { lock.unlock() }; return pointed }
 
-    func keyDown(feed: AudioFeed?) {
+    func attention() -> Attention {
+        lock.lock()
+        looks += 1
+        let n = looks
+        lock.unlock()
+        return Attention(window: TargetWindow(windowID: 0, pid: 0, appName: "Test", bundleID: "test", title: "look \(n)",
+                                              bounds: .zero))
+    }
+
+    func went(to at: Attention?) {
+        lock.lock()
+        if let title = at?.window?.title { pointed.append(title) }
+        lock.unlock()
+    }
+
+    func keyDown(feed: AudioFeed?, at: Attention?) {
         record("key down")
+        went(to: at)
         guard let feed = feed else { return }
         lock.lock()
         let i = received.count
@@ -250,22 +357,41 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
 
     func keyUp() { record("key up") }
     func cancelHeld() { record("dropped") }
-    func runTyped(_ command: String) async { record("command: \(command)") }
+
+    func runTyped(_ command: String, at: Attention?) async {
+        went(to: at)
+        record("command: \(command)")
+    }
+
     var isSpeaking: Bool { lock.lock(); defer { lock.unlock() }; return speaking }
 
     func transcribe(_ feed: AudioFeed, onPartial: @escaping (String) -> Void) -> Transcription? {
         record("transcribing")
         lock.lock()
-        let next = said.isEmpty ? (text: "", partials: []) : said.removeFirst()
+        let next = said.isEmpty ? Said(text: "") : said.removeFirst()
+        let i = checks.count
+        checks.append(0)
         lock.unlock()
-        feed.attach { _ in }
-        for p in next.partials { onPartial(p) }
-        return Heard(next.text, host: self)
+        var partials = next.partials[...]
+        feed.attach { [weak self] data in
+            guard let self = self else { return }
+            self.lock.lock()
+            self.checks[i] += data.count
+            let bytes = self.checks[i]
+            self.lock.unlock()
+            while let p = partials.first, Double(bytes) >= p.after * 48_000 {
+                partials.removeFirst()
+                onPartial(p.words)
+            }
+        }
+        return Heard(next, host: self)
     }
 }
 
 /// The hands-free session from "Hey Glance" to Esc, "thanks, Glance" or silence, with the clips as the microphone.
 @Suite(.serialized) struct HandsFreeSessionTests {
+    typealias Said = FakeHost.Said
+
     func quietPresence() -> Presence {
         let p = Presence()
         p.soundsOn = false
@@ -274,7 +400,10 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
 
     /// The clip in a quiet room, as the microphone brings it (80 ms chunks).
     func say(_ handsFree: HandsFree, _ clip: String, after: Double = 1.2) throws {
-        let audio = Clip.room(seconds: 0.6) + (try Clip.pcm(clip)) + Clip.room(seconds: after)
+        play(handsFree, Clip.room(seconds: 0.6) + (try Clip.pcm(clip)) + Clip.room(seconds: after))
+    }
+
+    func play(_ handsFree: HandsFree, _ audio: Data) {
         let chunk = 24_000 * 2 * 80 / 1000
         var offset = 0
         while offset < audio.count {
@@ -283,6 +412,9 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         }
         handsFree.settle()
     }
+
+    /// A cough or a door: 150 ms of loud noise.
+    var cough: Data { Clip.room(seconds: 0.6) + Clip.room(seconds: 0.15, level: 3000) + Clip.room(seconds: 1.2) }
 
     func eventually(_ seconds: Double = 2, _ condition: () -> Bool) async -> Bool {
         let end = Date().addingTimeInterval(seconds)
@@ -303,7 +435,7 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
 
     @Test("“Hey Glance” starts a session; then each thing said is a talk-key press with its audio; “thanks” ends it")
     func fullSession() async throws {
-        let host = FakeHost([("Hey Glance,", ["Hey", "Hey Glance,"])])
+        let host = FakeHost([Said(text: "Hey Glance,", partials: [(0.6, "Hey"), (1.0, "Hey Glance,")])])
         let presence = quietPresence()
         let handsFree = try await awake(host, presence)
         #expect(host.log == ["transcribing", "finish"])
@@ -313,6 +445,7 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         #expect(host.log.suffix(2) == ["key down", "key up"])
         let words = try Clip.pcm("hey-glance-command").count
         #expect(host.audio.first ?? 0 >= words, "the command got \(host.audio) bytes; the words are \(words)")
+        #expect(host.targets == ["look 2"])
 
         #expect(handsFree.filter("Hey Glance, make it red") == "make it red")
         #expect(handsFree.filter("make it red") == "make it red")
@@ -323,28 +456,99 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
 
     @Test("Talk that isn't for Glance stops sending at the second word, and nothing happens")
     func notForGlance() async throws {
-        let host = FakeHost([("Can you take a look at the logs later?", ["Can", "Can you"])])
+        let host = FakeHost([Said(text: "Can you take a look at the logs later?", partials: [(0.6, "Can"), (0.9, "Can you")])])
         let handsFree = HandsFree(host: host, presence: quietPresence())
         handsFree.startWithoutMic()
         try say(handsFree, "not-for-glance")
         try? await Task.sleep(nanoseconds: 200_000_000)
         #expect(host.log == ["transcribing", "stopped sending"])
+        #expect(Double(host.checked.first ?? 0) / 48_000 < 1.1, "sent \(host.checked) bytes")
         #expect(!handsFree.isActive)
     }
 
-    @Test("“Hey Glance, make this button green” in one breath starts a session and runs the command")
+    @Test("With no words back yet (the connection still opening), at most 2 s of what is said is sent")
+    func sendsTwoSecondsAtMost() async throws {
+        let host = FakeHost([Said(text: "Can you take a look at the logs later? Can you")])
+        let handsFree = HandsFree(host: host, presence: quietPresence())
+        handsFree.startWithoutMic()
+        let talk = try Clip.pcm("not-for-glance")
+        play(handsFree, Clip.room(seconds: 0.6) + talk + Clip.room(seconds: 0.3) + talk + Clip.room(seconds: 1.2))
+        #expect(await eventually { host.log == ["transcribing", "finish"] }, "\(host.log)")
+        #expect(host.checked == [HandsFree.wakeFrames * VoiceActivity.frameBytes], "sent \(host.checked) bytes of 4.5 s")
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        #expect(!handsFree.isActive)
+        #expect(host.audio.isEmpty)
+    }
+
+    @Test("“Hey Glance, make this button green” in one breath starts the session as the command begins, and runs it")
     func oneBreath() async throws {
-        let host = FakeHost([("Hey glance make this button green.", [])])
+        let host = FakeHost([Said(text: "Hey glance make this button green.", partials: [(0.9, "Hey glance make")])])
         let handsFree = HandsFree(host: host, presence: quietPresence())
         handsFree.startWithoutMic()
         try say(handsFree, "hey-glance-command")
         #expect(await eventually { host.log.contains("command: make this button green.") }, "\(host.log)")
         #expect(handsFree.isActive)
+        #expect(host.checked.first ?? 0 >= (try Clip.pcm("hey-glance-command")).count, "sent \(host.checked)")
+        #expect(host.targets == ["look 1"])
+    }
+
+    @Test("In one breath while the connection opens: only 2 s are checked, then all of it goes as a command")
+    func oneBreathWhileConnecting() async throws {
+        let host = FakeHost([Said(text: "Hey glance, make this")])
+        let handsFree = HandsFree(host: host, presence: quietPresence())
+        handsFree.startWithoutMic()
+        try say(handsFree, "hey-glance-command")
+        #expect(await eventually { host.log.suffix(2) == ["key down", "key up"] }, "\(host.log)")
+        #expect(host.checked == [HandsFree.wakeFrames * VoiceActivity.frameBytes])
+        #expect(host.audio.first ?? 0 >= (try Clip.pcm("hey-glance-command")).count, "the command got \(host.audio)")
+        #expect(host.targets == ["look 1"])
+        #expect(!host.log.contains { $0.hasPrefix("command:") })
+        #expect(handsFree.isActive)
+    }
+
+    @Test("A command said after “Hey Glance” and a pause, before its transcript is back, waits and then runs")
+    func pauseAfterWake() async throws {
+        let host = FakeHost([Said(text: "Hey Glance.", delay: 0.5)])
+        let handsFree = HandsFree(host: host, presence: quietPresence())
+        handsFree.startWithoutMic()
+        try say(handsFree, "hey-glance", after: 1.0)
+        try say(handsFree, "not-for-glance")      // the command, said at once
+        #expect(host.log == ["transcribing", "finish"])         // kept on the Mac meanwhile
+        #expect(await eventually { host.log.suffix(2) == ["key down", "key up"] }, "\(host.log)")
+        #expect(host.audio.first ?? 0 >= (try Clip.pcm("not-for-glance")).count, "the command got \(host.audio)")
+        #expect(host.targets == ["look 2"])        // where you pointed as you said it
+        #expect(handsFree.isActive)
+    }
+
+    @Test("Speech kept while other talk was checked gets its own “Hey Glance” check when that talk wasn't for Glance")
+    func wakeAfterOtherTalk() async throws {
+        let host = FakeHost([Said(text: "Can you take a look at the logs later?", delay: 0.5), Said(text: "Hey Glance.")])
+        let handsFree = HandsFree(host: host, presence: quietPresence())
+        handsFree.startWithoutMic()
+        try say(handsFree, "not-for-glance", after: 1.0)
+        try say(handsFree, "hey-glance")
+        #expect(host.log == ["transcribing", "finish"])
+        #expect(await eventually { handsFree.isActive }, "\(host.log)")
+        #expect(host.log == ["transcribing", "finish", "transcribing", "finish"])
+        #expect(host.audio.isEmpty)
+    }
+
+    @Test("A cough is not transcribed while Glance waits, and is no command in a session")
+    func coughs() async throws {
+        let host = FakeHost([Said(text: ""), Said(text: "Hey Glance.")])    // the cough's check is never finished
+        let handsFree = HandsFree(host: host, presence: quietPresence())
+        handsFree.startWithoutMic()
+        play(handsFree, cough)
+        #expect(host.log == ["transcribing", "stopped sending"])
+        try say(handsFree, "hey-glance")
+        #expect(await eventually { handsFree.isActive }, "\(host.log)")
+        play(handsFree, cough)
+        #expect(host.log.suffix(2) == ["key down", "dropped"])
     }
 
     @Test("Esc ends the session and drops what is half said")
     func escape() async throws {
-        let host = FakeHost([("Hey Glance.", [])])
+        let host = FakeHost([Said(text: "Hey Glance.")])
         let handsFree = try await awake(host, quietPresence())
         handsFree.listen(Clip.room(seconds: 0.6) + (try Clip.pcm("hey-glance-command")).prefix(48_000))   // 1 s of it
         handsFree.escape()
@@ -355,7 +559,7 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
 
     @Test("A session ends by itself after a while without speech")
     func idle() async throws {
-        let host = FakeHost([("Hey Glance.", [])])
+        let host = FakeHost([Said(text: "Hey Glance.")])
         let handsFree = try await awake(host, quietPresence())
         handsFree.idleTimeout = 0.3
         #expect(await eventually { !handsFree.isActive })
@@ -376,9 +580,16 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         #expect(host.audio == [words.count])
     }
 
+    @Test("With hands-free off, the talk key's words pass unchanged")
+    func filterWhenOff() {
+        let handsFree = HandsFree(host: FakeHost(), presence: quietPresence())
+        #expect(handsFree.filter("Hey Glance, make it red") == "Hey Glance, make it red")
+        #expect(handsFree.filter("Thanks, Glance.") == "Thanks, Glance.")
+    }
+
     @Test("While Glance reads a result aloud, it does not listen to itself")
     func deafWhileSpeaking() throws {
-        let host = FakeHost([("Hey Glance.", [])])
+        let host = FakeHost([Said(text: "Hey Glance.")])
         host.speaking = true
         let handsFree = HandsFree(host: host, presence: quietPresence())
         handsFree.startWithoutMic()

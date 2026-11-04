@@ -6,7 +6,8 @@ import Foundation
 // key while you spoke. The session ends with Esc, "thanks, Glance", or 30 s without speech.
 //
 // While Glance waits for "Hey Glance", a voice detector on the Mac finds speech, and only speech goes to Muse Voice
-// Transcribe. Glance stops sending as soon as the first words are not "Hey Glance", and drops what it heard.
+// Transcribe: at most its first 2 s until its words show it starts with "Hey Glance". Glance stops sending as soon
+// as the first words are not "Hey Glance", and drops what it heard. The rest of what is said stays on the Mac.
 
 /// Audio pushed into a voice session by the hands-free listener, instead of the session's own microphone.
 /// Audio pushed before the session attaches is kept, so the first syllable is not lost.
@@ -17,14 +18,15 @@ final class AudioFeed: @unchecked Sendable {
     private var early: [Data] = []
     private var earlyBytes = 0
 
+    /// The sink gets the kept audio, then the rest as it comes, in order. It is called with the feed's lock held,
+    /// so it must hand the audio on and not call back into the feed.
     func attach(_ sink: @escaping (Data) -> Void) {
         lock.lock()
-        let kept = early
+        defer { lock.unlock() }
+        for chunk in early { sink(chunk) }
         early = []
         earlyBytes = 0
         self.sink = sink
-        lock.unlock()
-        for chunk in kept { sink(chunk) }
     }
 
     func detach() {
@@ -35,16 +37,13 @@ final class AudioFeed: @unchecked Sendable {
 
     func push(_ data: Data) {
         lock.lock()
+        defer { lock.unlock() }
         if let sink = sink {
-            lock.unlock()
             sink(data)
-            return
-        }
-        if earlyBytes < AudioFeed.keepAtMost {
+        } else if earlyBytes < AudioFeed.keepAtMost {
             early.append(data)
             earlyBytes += data.count
         }
-        lock.unlock()
     }
 }
 
@@ -122,14 +121,10 @@ struct VoiceActivity {
         return nil
     }
 
-    /// A frame that must not count as speech (Glance's own voice or sound): it can end speech, and teaches nothing
-    /// about the room.
-    mutating func ignore() -> Event? {
-        guard speaking else {
-            loud = 0
-            return nil
-        }
-        return process(level: -90)
+    /// A frame that must not count (Glance's own voice or sound): it neither starts speech nor ends it, so a sound
+    /// played while you talk does not cut you off, and it teaches nothing about the room.
+    mutating func ignore() {
+        if speaking { spoken += 1 } else { loud = 0 }
     }
 
     /// Back to waiting for speech (the room's level is kept).
@@ -144,11 +139,15 @@ struct VoiceActivity {
 enum WakePhrase {
     private static let greetings: Set<String> = ["hey", "hi", "hay", "hei", "a", "ok", "okay", "hello", "yo"]
     private static let names: Set<String> = ["glance", "glances", "glans", "glanz", "glants", "lance", "clance"]
+    /// "Hey, glance at this": the verb, said to someone else, not Glance's name.
+    private static let afterTheVerb: Set<String> = ["at", "over", "through", "around", "across", "toward", "towards"]
     private static let goodbyes: Set<String> = [
-        "thanks", "thank you", "thanks glance", "thank you glance", "bye glance", "goodbye glance", "good bye glance",
-        "stop listening", "glance stop listening", "thats all", "thats all glance", "thats it", "thats it glance",
-        "go to sleep", "glance go to sleep", "sleep glance",
+        "thanks", "thank you", "thanks so much", "thank you so much", "bye", "goodbye", "good bye",
+        "stop listening", "thats all", "thats it", "go to sleep", "sleep",
     ]
+    /// Said before a goodbye: "OK, thanks Glance", "great, thank you".
+    private static let fillers: Set<String> = ["ok", "okay", "alright", "great", "cool", "perfect", "nice", "oh", "um",
+                                               "uh", "well", "so", "hey", "hi"]
     private static let lead = try! NSRegularExpression(
         pattern: "^\\W*(\(greetings.sorted().joined(separator: "|")))\\W+(\(names.sorted().joined(separator: "|")))\\b\\W*",
         options: [.caseInsensitive])
@@ -161,25 +160,36 @@ enum WakePhrase {
             .filter { !$0.isEmpty }
     }
 
-    /// "Hey Glance, make this red." → (true, "make this red."); "Take a glance at this" → (false, the text).
+    /// "Hey Glance, make this red." → (true, "make this red."); "Hey, glance at this" → (false, the text).
     static func split(_ text: String) -> (woke: Bool, rest: String) {
         let range = NSRange(text.startIndex..., in: text)
         guard let match = lead.firstMatch(in: text, range: range), let end = Range(match.range, in: text) else {
             return (false, text)
         }
-        return (true, String(text[end.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines))
+        let rest = String(text[end.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let next = words(rest).first, afterTheVerb.contains(next) { return (false, text) }
+        return (true, rest)
     }
 
-    /// While the words are still coming in: false as soon as the first two cannot be "Hey Glance".
+    /// While the words are still coming in: false as soon as they cannot be "Hey Glance" (the first two words are
+    /// something else, or the third shows "glance" was the verb).
     static func mightStart(_ partial: String) -> Bool {
         let w = words(partial)
         guard w.count >= 2 else { return true }
-        return greetings.contains(w[0]) && names.contains(w[1])
+        guard greetings.contains(w[0]), names.contains(w[1]) else { return false }
+        return w.count < 3 || !afterTheVerb.contains(w[2])
     }
 
-    /// "Thanks, Glance", "stop listening", "that's all": the whole sentence, so "stop the server" is a command.
+    /// The words so far surely start with "Hey Glance": a word follows it, and that word is not "at".
+    static func confirms(_ partial: String) -> Bool {
+        words(partial).count >= 3 && mightStart(partial)
+    }
+
+    /// "Thanks, Glance", "OK, stop listening", "that's all": the whole sentence, so "stop the server" is a command.
     static func isGoodbye(_ text: String) -> Bool {
-        goodbyes.contains(words(text).joined(separator: " "))
+        var w = words(text).filter { !names.contains($0) }
+        while let first = w.first, fillers.contains(first) { w.removeFirst() }
+        return goodbyes.contains(w.joined(separator: " "))
     }
 }
 
@@ -205,11 +215,12 @@ final class Presence: @unchecked Sendable {
         return !reasons.isEmpty
     }
 
-    /// True for a moment after a sound, so the hands-free listener does not take Glance's own sound for speech.
+    /// True while a sound plays (the longer one, Bottle, lasts 0.77 s), so the hands-free listener does not take
+    /// Glance's own sound for speech.
     var justPlayed: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return Date().timeIntervalSince(lastSound) < 0.6
+        return Date().timeIntervalSince(lastSound) < 1.0
     }
 
     func set(_ reason: Reason, _ on: Bool) {
@@ -231,7 +242,7 @@ final class Presence: @unchecked Sendable {
     }
 }
 
-/// One utterance heard while waiting for "Hey Glance": transcribed, never run.
+/// One utterance heard while waiting for "Hey Glance": transcribed, never run. `cancel()` may come after `finish()`.
 protocol Transcription: AnyObject, Sendable {
     func finish() async -> String
     func cancel()
@@ -244,35 +255,48 @@ extension VoiceSession: Transcription {
 
 /// What hands-free needs from Glance (Glance itself; the tests stand in for it).
 protocol HandsFreeHost: AnyObject, Sendable {
-    func keyDown(feed: AudioFeed?)
+    /// What is under the pointer now. A hands-free command goes where you pointed as you started saying it.
+    func attention() -> Attention
+    func keyDown(feed: AudioFeed?, at: Attention?)
     func keyUp()
     func cancelHeld()
     func transcribe(_ feed: AudioFeed, onPartial: @escaping (String) -> Void) -> Transcription?
-    func runTyped(_ command: String) async
+    func runTyped(_ command: String, at: Attention?) async
     var isSpeaking: Bool { get }
 }
 
 /// Listens for "Hey Glance", then runs the hands-free session. One microphone for everything: while the talk key
 /// is held, its audio goes to the key's command instead.
 final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
-    var idleTimeout = 30.0                   // seconds without speech that end a session
+    /// The most of anything said that goes to Muse before its words show it starts with "Hey Glance".
+    static let wakeFrames = 100              // 2 s, in 20 ms frames
     var onSessionChange: ((Bool) -> Void)?
 
-    private enum Kind {
-        case wake(Transcription)             // waiting for "Hey Glance": only transcribed
-        case command                         // in a session: a talk-key press, made by voice
-    }
+    /// One stretch of speech, from just before it started.
+    private final class Utterance: @unchecked Sendable {   // used on `queue` only
+        enum Kind {
+            case wake(AudioFeed, Transcription)   // waiting for "Hey Glance": its start is transcribed, never run
+            case held                             // said while an earlier "Hey Glance" is still being transcribed
+            case command(AudioFeed)               // in a session: a talk-key press, made by voice
+            case dropped                          // not for Glance
+        }
+        var kind = Kind.held
+        let at: Attention                         // what was under the pointer as it started
+        var audio: [Data]                         // all of it so far, kept on the Mac (until it is a command)
+        var sent = 0                              // frames of `audio` sent to be checked for "Hey Glance"
+        var confirmed = false                     // its words so far start with "Hey Glance"
+        var frames = 0                            // 20 ms frames heard since speech started
+        var ended = false
 
-    private struct Utterance {
-        let feed: AudioFeed
-        let kind: Kind
-        var frames = 0                       // how long it is, in 20 ms frames of audio
-        var dropped = false
+        init(at: Attention, audio: [Data]) {
+            self.at = at
+            self.audio = audio
+        }
     }
 
     private let queue = DispatchQueue(label: "glance.handsfree")
     private let keys = DispatchQueue(label: "glance.handsfree.keys")   // keeps key down before key up
-    private let mic = MicCapture()
+    private let mic = MicCapture(demoClips: false)                       // demo clips are for the talk key
     private let host: HandsFreeHost
     private let presence: Presence
     private var vad = VoiceActivity()
@@ -280,8 +304,11 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
     private var preroll: [Data] = []         // the last 400 ms, so a command keeps its first syllable
     private var running = false
     private var active = false
+    private var idleSeconds = 30.0
     private var lastSpeech = Date()
-    private var utterance: Utterance?
+    private var current: Utterance?          // being said now
+    private var checking: Utterance?         // finished; its transcript says whether it was "Hey Glance"
+    private var held: [Utterance] = []       // said meanwhile, kept on the Mac until then
     private var borrowed: AudioFeed?
     private var ticker: DispatchSourceTimer?
 
@@ -292,6 +319,12 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
 
     var isRunning: Bool { queue.sync { running } }
     var isActive: Bool { queue.sync { active } }
+
+    /// Seconds without speech that end a session.
+    var idleTimeout: Double {
+        get { queue.sync { idleSeconds } }
+        set { queue.sync { idleSeconds = newValue } }
+    }
 
     /// Starts listening for "Hey Glance". Returns false if the microphone could not start.
     func start() -> Bool {
@@ -344,11 +377,11 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         queue.sync {
             guard running else { return false }
             if borrowed != nil { return true }
-            dropUtterance()
+            dropAll()
             let feed = AudioFeed()
             borrowed = feed
             vad.reset()
-            keys.async { self.host.keyDown(feed: feed) }
+            keys.async { self.host.keyDown(feed: feed, at: nil) }
             return true
         }
     }
@@ -364,9 +397,10 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
     }
 
     /// Every transcript of a command passes here first: nil drops it. "Thanks, Glance" ends the session, and a
-    /// "Hey Glance" said again inside one is taken off the front.
+    /// "Hey Glance" said again inside one is taken off the front. With hands-free off, the words pass unchanged.
     func filter(_ text: String) -> String? {
-        let inSession = queue.sync { active }
+        let (on, inSession) = queue.sync { (running, active) }
+        guard on else { return text }
         if inSession && WakePhrase.isGoodbye(text) {
             queue.async { self.endSession("you said “\(text.trimmingCharacters(in: .whitespacesAndNewlines))”") }
             return nil
@@ -376,7 +410,8 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         return text
     }
 
-    /// Waits until the key presses hands-free made have reached Glance (for the tests).
+    /// Waits until what hands-free has heard so far has been handled, and its key presses have reached Glance
+    /// (for the tests).
     func settle() {
         queue.sync {}
         keys.sync {}
@@ -411,101 +446,208 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
     private func frame(_ frame: Data) {
         // Glance's own voice and sounds are not speech to listen to.
         let deaf = host.isSpeaking || presence.justPlayed
-        let event = deaf ? vad.ignore() : vad.process(frame)
-        if let u = utterance {
-            u.feed.push(frame)
-            utterance?.frames += 1
+        var event: VoiceActivity.Event?
+        if deaf { vad.ignore() } else { event = vad.process(frame) }
+        if let u = current {
+            u.frames += 1
+            switch u.kind {
+            case .command(let feed): feed.push(frame)
+            case .wake: u.audio.append(frame); send(u)
+            case .held: u.audio.append(frame)
+            case .dropped: break
+            }
+        } else if deaf {
+            preroll.removeAll()          // a command said right after must not start with Glance's sound
         } else {
             preroll.append(frame)
             if preroll.count > 20 { preroll.removeFirst(preroll.count - 20) }
         }
         switch event {
-        case .started?: beginUtterance()
-        case .ended?: finishUtterance()
+        case .started?: begin()
+        case .ended?: end()
         case nil: break
         }
     }
 
-    private func beginUtterance() {
-        let feed = AudioFeed()
-        for f in preroll { feed.push(f) }
+    private func begin() {
+        let u = Utterance(at: host.attention(), audio: preroll)
         preroll.removeAll()
+        current = u
         if active {
-            lastSpeech = Date()
-            utterance = Utterance(feed: feed, kind: .command)
-            keys.async { self.host.keyDown(feed: feed) }
-            return
+            startCommand(u)
+        } else if checking != nil {
+            held.append(u)               // "Hey Glance" may have just been said: wait for its transcript
+        } else {
+            startWake(u)
         }
-        let heard = host.transcribe(feed) { [weak self] partial in
-            self?.queue.async {
-                guard let self = self, !WakePhrase.mightStart(partial), let u = self.utterance, u.feed === feed,
-                      case .wake(let t) = u.kind else { return }
-                t.cancel()                 // not for Glance: stop sending
-                self.utterance?.dropped = true
-            }
-        }
-        guard let transcription = heard else { return }
-        utterance = Utterance(feed: feed, kind: .wake(transcription))
     }
 
-    private func finishUtterance() {
-        guard let u = utterance else { return }
-        utterance = nil
+    private func end() {
+        guard let u = current else { return }
+        current = nil
+        u.ended = true
+        // A cough, a door, a click: too short to be words (the last 800 ms are the quiet that ended it).
+        let short = Double(u.frames - vad.endFrames + vad.startFrames) * VoiceActivity.frameSeconds < 0.3
         switch u.kind {
         case .command:
             lastSpeech = Date()
-            keys.async { self.host.keyUp() }
-        case .wake(let transcription):
-            u.feed.detach()
-            if u.dropped { return }                                              // already stopped sending
-            if Double(u.frames) * VoiceActivity.frameSeconds < 0.4 {            // a cough, a door
+            keys.async { short ? self.host.cancelHeld() : self.host.keyUp() }
+        case .wake(_, let transcription):
+            if short {
                 transcription.cancel()
-                return
+                drop(u)
+            } else {
+                check(u, transcription)
             }
-            Task.detached {
-                let text = await transcription.finish()
-                self.queue.async { self.heardWhileWaiting(text) }
-            }
+        case .held:
+            if short { held.removeAll { $0 === u } }
+        case .dropped:
+            break
         }
     }
 
-    private func heardWhileWaiting(_ text: String) {
+    /// Waiting for "Hey Glance": what is said goes to be transcribed, 2 s of it at most until its words confirm it.
+    private func startWake(_ u: Utterance) {
+        let feed = AudioFeed()
+        let heard = host.transcribe(feed) { [weak self, weak u] partial in
+            self?.queue.async {
+                if let u = u { self?.heard(partial, in: u) }
+            }
+        }
+        guard let transcription = heard else {
+            u.kind = .dropped
+            return
+        }
+        u.kind = .wake(feed, transcription)
+        send(u)
+    }
+
+    /// Sends what the "Hey Glance" check may have so far: the first 2 s, or all of it once its words confirm it.
+    private func send(_ u: Utterance) {
+        guard case .wake(let feed, _) = u.kind else { return }
+        let allowed = u.confirmed ? u.audio.count : min(u.audio.count, HandsFree.wakeFrames)
+        while u.sent < allowed {
+            feed.push(u.audio[u.sent])
+            u.sent += 1
+        }
+    }
+
+    private func heard(_ partial: String, in u: Utterance) {
+        guard case .wake(_, let transcription) = u.kind else { return }
+        if !WakePhrase.mightStart(partial) {
+            transcription.cancel()               // not for Glance: stop sending
+            drop(u)
+        } else if !u.confirmed && WakePhrase.confirms(partial) {
+            u.confirmed = true
+            send(u)                              // what was held back
+            startSession()
+            release()
+        }
+    }
+
+    /// It ended: its transcript says whether it was "Hey Glance". What is said meanwhile waits on the Mac.
+    private func check(_ u: Utterance, _ transcription: Transcription) {
+        checking = u
+        Task.detached {
+            let text = await transcription.finish()
+            self.queue.async { self.verdict(text, on: u) }
+        }
+    }
+
+    private func verdict(_ text: String, on u: Utterance) {
+        guard checking === u else { return }
+        checking = nil
         let (woke, rest) = WakePhrase.split(text)
-        guard woke, running, !active else { return }
+        if woke && running {
+            startSession()
+            if u.sent < u.audio.count {
+                // Only its first 2 s went to be checked: now all of it is a command, where you pointed.
+                startCommand(u)
+            } else if !rest.isEmpty {
+                // "Hey Glance, make this red" in one breath: the rest is a command for where you pointed.
+                let at = u.at
+                Task.detached { await self.host.runTyped(rest, at: at) }
+            }
+        }
+        if case .wake = u.kind { u.kind = .dropped }
+        u.audio = []
+        release()
+    }
+
+    /// What was said while "Hey Glance" was checked: commands if it woke Glance, else checked the same way in turn.
+    private func release() {
+        while !held.isEmpty, active || checking == nil {
+            let u = held.removeFirst()
+            if active {
+                startCommand(u)
+                continue
+            }
+            startWake(u)
+            if u.ended, case .wake(_, let transcription) = u.kind { check(u, transcription) }
+        }
+    }
+
+    /// A talk-key press made by voice, with all of the utterance so far; more follows while it goes on.
+    private func startCommand(_ u: Utterance) {
+        let feed = AudioFeed()
+        for f in u.audio { feed.push(f) }
+        u.audio = []
+        u.kind = .command(feed)
+        lastSpeech = Date()
+        let at = u.at
+        keys.async { self.host.keyDown(feed: feed, at: at) }
+        if u.ended { keys.async { self.host.keyUp() } }
+    }
+
+    private func drop(_ u: Utterance) {
+        u.kind = .dropped
+        u.audio = []
+        if checking === u {
+            checking = nil
+            release()
+        }
+    }
+
+    /// Forgets everything half said or waiting (the talk key went down, or the session ended).
+    private func dropAll() {
+        for u in [current, checking].compactMap({ $0 }) + held {
+            switch u.kind {
+            case .wake(_, let transcription): transcription.cancel()
+            case .command: if !u.ended { keys.async { self.host.cancelHeld() } }
+            case .held, .dropped: break
+            }
+            u.kind = .dropped
+            u.audio = []
+        }
+        current = nil
+        checking = nil
+        held = []
+    }
+
+    private func startSession() {
+        guard !active else { return }
         active = true
         lastSpeech = Date()
+        vad.longestFrames = 1500                 // 30 s: a long command is not cut in two
         presence.set(.session, true)
         onSessionChange?(true)
         print("\nHey! Hands-free: point at a window and talk. Esc or “thanks, Glance” ends it.")
-        if !rest.isEmpty {
-            // "Hey Glance, make this red" in one breath: the rest is a command for the window under the pointer.
-            Task.detached { await self.host.runTyped(rest) }
-        }
         Glance.prompt()
     }
 
-    private func dropUtterance() {
-        guard let u = utterance else { return }
-        utterance = nil
-        u.feed.detach()
-        switch u.kind {
-        case .wake(let transcription): transcription.cancel()
-        case .command: keys.async { self.host.cancelHeld() }
-        }
-    }
-
     private func checkIdle() {
-        guard active, utterance == nil, borrowed == nil,
-              Date().timeIntervalSince(lastSpeech) > idleTimeout else { return }
-        endSession("\(Int(idleTimeout)) s without speech")
+        guard active, current == nil, checking == nil, borrowed == nil,
+              Date().timeIntervalSince(lastSpeech) > idleSeconds else { return }
+        endSession("\(Int(idleSeconds)) s without speech")
     }
 
     private func endSession(_ why: String?) {
-        dropUtterance()
+        dropAll()
         vad.reset()
         preroll.removeAll()
         guard active else { return }
         active = false
+        vad.longestFrames = VoiceActivity().longestFrames
         presence.set(.session, false)
         onSessionChange?(false)
         if let why = why {
