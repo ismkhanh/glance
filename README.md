@@ -102,8 +102,9 @@ For browsers, also turn on View > Developer > Allow JavaScript from Apple Events
 
 Point at anything with the mouse, or with your head (macOS Head Pointer on):
 
-- A **glow** follows the window under the pointer, a smaller glow and a **name tag** follow the element under it
-  (button, link, text, field). "this", "that" and "here" in a command mean that element.
+- While Glance listens (⌥ held, or a hands-free session on), a **glow** follows the window under the pointer, and a
+  smaller glow and a **name tag** follow the element under it (button, link, text, field). "this", "that" and "here"
+  in a command mean that element. The rest of the time the glow stays out of the way.
 - **Snap:** you don't have to be exactly on a button. Within 40 pt the glow jumps to the nearest one (the tag shows ↪).
 - **Numbers:** while you hold the key, up to 5 clickables near the pointer get number badges. Say "click two",
   "the one on the left" or "the blue one". The glow moves to Muse's pick before anything is clicked.
@@ -111,8 +112,8 @@ Point at anything with the mouse, or with your head (macOS Head Pointer on):
   free again as soon as you let go: the command becomes a task with its own card on that window, and you can point at
   the next window and talk while it works.
 - The **mascot** (bottom right) shows whether Glance can hear you: its eye is closed while Glance isn't listening, and
-  opens and follows your pointer while it is. A short sound marks the start and the end (◉ Glance > "Sounds when
-  Glance starts and stops listening" turns them off).
+  opens and follows your pointer while it is. A short sound marks the start and the end, and in a hands-free session
+  a pop says a command was heard (◉ Glance > "Sounds when Glance listens and hears you" turns them off).
 - Click the **mascot** for the list of tasks and their results. 🔊/🔇 in the list (or ◉ Glance >
   "Read results aloud") switches spoken results on and off; `--say` starts with them on.
 - Or type a command in the terminal and press Enter.
@@ -121,12 +122,12 @@ Point at anything with the mouse, or with your head (macOS Head Pointer on):
 
 | Glow colour | Meaning |
 | --- | --- |
-| Blue | following the pointer |
+| Blue | following the pointer (in a hands-free session) |
 | Green | listening (key held) |
 | Purple | Muse is working |
 | Orange | waiting for your yes or no |
 
-Turn the glow off with ◉ Glance > "Highlight what I point at". Quit with `quit` in the terminal or the menu.
+Turn the glow off altogether with ◉ Glance > "Highlight what I point at". Quit with `quit` in the terminal or the menu.
 
 Try with the pointer on a button: "click this", "what does this do?". On a paragraph: "explain this".
 
@@ -144,7 +145,8 @@ Start with `--hey-glance`, or turn on ◉ Glance > "Listen for “Hey Glance”"
 
 - Say **"Hey Glance"**. The eye opens and you hear a sound: a hands-free session has started.
 - Point at a window and talk. Each thing you say is a command for the window under the pointer when you start saying
-  it, exactly as if you held ⌥ while you spoke. Point at another window and keep talking: no "Hey Glance" again.
+  it, exactly as if you held ⌥ while you spoke. When you stop, a soft pop says Glance has it: point at another window
+  and keep talking, no "Hey Glance" again. The glow shows where your next words will go.
 - "Hey Glance, make this button green" in one breath starts the session and runs the command.
 - **Esc**, "thanks, Glance", "stop listening" or 30 s without speech ends the session: the eye closes and you hear the
   closing sound. Answer a yes/no question with just the answer ("yes, go ahead", "no"): other talk in the room

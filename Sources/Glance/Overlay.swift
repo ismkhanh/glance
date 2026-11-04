@@ -516,7 +516,17 @@ final class Highlighter: NSObject {
         }
     }
 
+    /// The glow shows only while Glance listens (the talk key is held, or a hands-free session is on), so it is not
+    /// in the way the rest of the time. What is under the pointer is still followed, ready for when you talk.
+    private var visible: Bool { locked != nil || Presence.shared.listening }
+
     private func draw(_ window: TargetWindow?, _ element: PointedElement?) {
+        guard visible else {
+            windowGlow.hide()
+            elementGlow.hide()
+            tag.hide()
+            return
+        }
         if let w = window {
             windowGlow.show(w.bounds, color: color)
         } else {

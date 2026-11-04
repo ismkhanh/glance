@@ -156,7 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         handsFreeItem?.isEnabled = micAllowed
         handsFreeItem?.state = handsFree.isRunning ? .on : .off
         print("""
-        The blue glow shows the window and element under your pointer; "this" in a command means that element.
+        While Glance listens, a glow shows the window and element under your pointer; "this" in a command means it.
         Figma: open Plugins > Development > Glance Bridge once per file. Then point at a layer and talk; commands
         run in parallel. Questions appear where you pointed. Click the mascot (bottom right) for the task list.
         You can also type a command here and press Enter. Type quit to stop. Menu bar: ◉ Glance.
@@ -199,7 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wake.target = self
         menu.addItem(wake)
         handsFreeItem = wake
-        let sounds = NSMenuItem(title: "Sounds when Glance starts and stops listening", action: #selector(toggleSounds(_:)),
+        let sounds = NSMenuItem(title: "Sounds when Glance listens and hears you", action: #selector(toggleSounds(_:)),
                                 keyEquivalent: "")
         sounds.target = self
         sounds.state = Presence.shared.soundsOn ? .on : .off

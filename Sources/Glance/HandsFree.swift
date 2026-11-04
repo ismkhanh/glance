@@ -193,16 +193,22 @@ enum WakePhrase {
     }
 }
 
-/// Whether Glance is listening: the talk key is held, or a hands-free session is on. The mascot's eye is open only
-/// then, and a short sound marks each change, so you always know whether Glance can hear you.
+/// Whether Glance is listening: the talk key is held, or a hands-free session is on. The mascot's eye and the glow
+/// show only then, and a short sound marks each change, so you always know whether Glance can hear you. In a
+/// session, a pop says a command was heard to its end: point at the next window and go on.
 final class Presence: @unchecked Sendable {
     static let shared = Presence()
     enum Reason { case key, session }
 
+    /// How long after it starts each sound can reach the microphone: audible for 0.06 s (Tink), 0.22 s (Pop) and
+    /// 0.5 s (Bottle), plus the speaker's delay and the room's echo.
+    private static let heardFor: [String: Double] = ["Tink": 0.4, "Pop": 0.55, "Bottle": 0.8]
+
     private let lock = NSLock()
     private var reasons: Set<Reason> = []
-    private var lastSound = Date.distantPast
+    private var deafUntil = Date.distantPast
     private var sounds = true
+    private var heard = 0
 
     var soundsOn: Bool {
         get { lock.lock(); defer { lock.unlock() }; return sounds }
@@ -215,12 +221,18 @@ final class Presence: @unchecked Sendable {
         return !reasons.isEmpty
     }
 
-    /// True while a sound plays (the longer one, Bottle, lasts 0.77 s), so the hands-free listener does not take
-    /// Glance's own sound for speech.
+    /// True while one of Glance's sounds can still be heard, so the hands-free listener does not take it for speech.
     var justPlayed: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return Date().timeIntervalSince(lastSound) < 1.0
+        return Date() < deafUntil
+    }
+
+    /// Commands heard to their end in hands-free sessions (for the tests).
+    var commandsHeard: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return heard
     }
 
     func set(_ reason: Reason, _ on: Bool) {
@@ -228,17 +240,35 @@ final class Presence: @unchecked Sendable {
         let before = !reasons.isEmpty
         if on { reasons.insert(reason) } else { reasons.remove(reason) }
         let after = !reasons.isEmpty
-        let play = sounds && before != after
-        if play { lastSound = Date() }
+        let sound = sounds && before != after ? (after ? "Tink" : "Bottle") : nil
+        if let name = sound { deafen(name) }
         lock.unlock()
         guard before != after else { return }
         DispatchQueue.main.async {
             MascotModel.shared.awake = after
-            if play, let sound = NSSound(named: after ? "Tink" : "Bottle") {
-                sound.volume = 0.4
-                sound.play()
-            }
+            if let name = sound { Presence.play(name) }
         }
+    }
+
+    /// A hands-free command was heard to its end: a pop, so you know you can point at the next window.
+    func gotIt() {
+        lock.lock()
+        heard += 1
+        let play = sounds
+        if play { deafen("Pop") }
+        lock.unlock()
+        if play { DispatchQueue.main.async { Presence.play("Pop") } }
+    }
+
+    /// With `lock` held.
+    private func deafen(_ name: String) {
+        deafUntil = max(deafUntil, Date().addingTimeInterval(Presence.heardFor[name] ?? 1.0))
+    }
+
+    private static func play(_ name: String) {
+        guard let sound = NSSound(named: name) else { return }
+        sound.volume = 0.4
+        sound.play()
     }
 }
 
@@ -491,12 +521,14 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         switch u.kind {
         case .command:
             lastSpeech = Date()
+            if !short { presence.gotIt() }
             keys.async { short ? self.host.cancelHeld() : self.host.keyUp() }
         case .wake(_, let transcription):
             if short {
                 transcription.cancel()
                 drop(u)
             } else {
+                if u.confirmed { presence.gotIt() }     // "Hey Glance, make this red" in one breath
                 check(u, transcription)
             }
         case .held:

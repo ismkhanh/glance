@@ -441,8 +441,10 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         #expect(host.log == ["transcribing", "finish"])
         #expect(presence.listening)
 
+        #expect(presence.commandsHeard == 0)
         try say(handsFree, "hey-glance-command")
         #expect(host.log.suffix(2) == ["key down", "key up"])
+        #expect(presence.commandsHeard == 1)            // the pop: point at the next window
         let words = try Clip.pcm("hey-glance-command").count
         #expect(host.audio.first ?? 0 >= words, "the command got \(host.audio) bytes; the words are \(words)")
         #expect(host.targets == ["look 2"])
@@ -483,9 +485,11 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
     @Test("“Hey Glance, make this button green” in one breath starts the session as the command begins, and runs it")
     func oneBreath() async throws {
         let host = FakeHost([Said(text: "Hey glance make this button green.", partials: [(0.9, "Hey glance make")])])
-        let handsFree = HandsFree(host: host, presence: quietPresence())
+        let presence = quietPresence()
+        let handsFree = HandsFree(host: host, presence: presence)
         handsFree.startWithoutMic()
         try say(handsFree, "hey-glance-command")
+        #expect(presence.commandsHeard == 1)
         #expect(await eventually { host.log.contains("command: make this button green.") }, "\(host.log)")
         #expect(handsFree.isActive)
         #expect(host.checked.first ?? 0 >= (try Clip.pcm("hey-glance-command")).count, "sent \(host.checked)")
@@ -536,7 +540,8 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
     @Test("A cough is not transcribed while Glance waits, and is no command in a session")
     func coughs() async throws {
         let host = FakeHost([Said(text: ""), Said(text: "Hey Glance.")])    // the cough's check is never finished
-        let handsFree = HandsFree(host: host, presence: quietPresence())
+        let presence = quietPresence()
+        let handsFree = HandsFree(host: host, presence: presence)
         handsFree.startWithoutMic()
         play(handsFree, cough)
         #expect(host.log == ["transcribing", "stopped sending"])
@@ -544,6 +549,7 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         #expect(await eventually { handsFree.isActive }, "\(host.log)")
         play(handsFree, cough)
         #expect(host.log.suffix(2) == ["key down", "dropped"])
+        #expect(presence.commandsHeard == 0)            // no pop for a cough
     }
 
     @Test("Esc ends the session and drops what is half said")
