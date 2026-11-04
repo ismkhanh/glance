@@ -19,7 +19,8 @@ let package = Package(
         .testTarget(
             name: "GlanceTests",
             dependencies: ["Glance"],
-            path: "Tests/GlanceTests"
+            path: "Tests/GlanceTests",
+            resources: [.copy("Fixtures")]      // spoken clips for the hands-free tests
         ),
     ],
     swiftLanguageVersions: [.v5]

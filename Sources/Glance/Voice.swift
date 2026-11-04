@@ -150,6 +150,7 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
     private var waiter: CheckedContinuation<String, Error>?
     private var failure: String?
     private var done = false
+    private var feed: AudioFeed?
     private let mic = MicCapture()
 
     init(key: String) {
@@ -188,33 +189,44 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
         }
     }
 
-    /// Starts sending the microphone. Call when the user starts talking.
-    func startTalking() throws {
+    /// Starts sending the microphone, or the hands-free listener's audio when `feed` is given. Call when the user
+    /// starts talking.
+    func startTalking(feed: AudioFeed? = nil) throws {
         queue.sync {
             talking = true
             readyWhenTalkStarted = ready
+            self.feed = feed
         }
-        do {
-            try mic.start { [weak self] data in
-                guard let self = self else { return }
-                self.queue.async {
-                    if self.done || self.endRequested { return }
-                    if self.ready {
-                        self.send(data)
-                    } else {
-                        self.pending.append(data)
-                    }
+        let deliver: (Data) -> Void = { [weak self] data in
+            guard let self = self else { return }
+            self.queue.async {
+                if self.done || self.endRequested { return }
+                if self.ready {
+                    self.send(data)
+                } else {
+                    self.pending.append(data)
                 }
             }
+        }
+        if let feed = feed {
+            feed.attach(deliver)
+            return
+        }
+        do {
+            try mic.start(onData: deliver)
         } catch {
             queue.sync { talking = false }
             throw error
         }
     }
 
-    /// Stops the microphone and waits for the final transcript.
+    /// Stops the microphone (or the feed) and waits for the final transcript.
     func stopTalking(timeout: Double = 12) async throws -> String {
-        mic.stop()
+        if let feed = queue.sync(execute: { self.feed }) {
+            feed.detach()
+        } else {
+            mic.stop()
+        }
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
             queue.async {
                 if let f = self.failure {

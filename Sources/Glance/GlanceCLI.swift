@@ -46,7 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var brain: BrainLink?
     private var tasksUI: TasksUI?
     private var speechItem: NSMenuItem?
+    private var handsFreeItem: NSMenuItem?
     private var gaze: GazeInput?
+    private var handsFree: HandsFree?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("Glance: talk to the window under your pointer.")
@@ -112,18 +114,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             gaze = g
         }
 
+        // Hands-free ("Hey Glance") shares the microphone with the talk key, so the key goes through it first.
+        let handsFree = HandsFree(host: glance)
+        self.handsFree = handsFree
+        glance.transform = { [weak handsFree] text in handsFree.map { $0.filter(text) } ?? text }
+        handsFree.onSessionChange = { on in DispatchQueue.main.async { glance.handsFreeChanged(on) } }
+
         let choice = TalkKeyChoice.fromArguments()
         let talkKey = TalkKey(choice)
         self.talkKey = talkKey
         var keyWorks = false
         if micAllowed {
-            keyWorks = talkKey.start(onDown: { glance.keyDown() }, onUp: { glance.keyUp() })
+            keyWorks = talkKey.start(onDown: {
+                Presence.shared.set(.key, true)
+                if !handsFree.keyDown() { glance.keyDown() }
+            }, onUp: {
+                Presence.shared.set(.key, false)
+                if !handsFree.keyUp() { glance.keyUp() }
+            }, onEscape: { handsFree.escape() })
         }
         if keyWorks {
             print("Hold \(choice.label) from any app, speak, and let go. Other keys: --talk-key right-option | right-command | right-control | fn")
         } else if micAllowed {
             print("Could not watch the \(choice.label) key: allow your terminal app in Privacy & Security > Input Monitoring, then reopen it.")
         }
+        if micAllowed && CommandLine.arguments.contains("--hey-glance") {
+            _ = handsFree.start()
+        }
+        handsFreeItem?.isEnabled = micAllowed
+        handsFreeItem?.state = handsFree.isRunning ? .on : .off
         print("""
         The blue glow shows the window and element under your pointer; "this" in a command means that element.
         Figma: open Plugins > Development > Glance Bridge once per file. Then point at a layer and talk; commands
@@ -163,6 +182,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         speech.target = self
         menu.addItem(speech)
         speechItem = speech
+        let wake = NSMenuItem(title: "Listen for “Hey Glance”", action: #selector(toggleHandsFree(_:)), keyEquivalent: "")
+        wake.target = self
+        menu.addItem(wake)
+        handsFreeItem = wake
+        let sounds = NSMenuItem(title: "Sounds when Glance starts and stops listening", action: #selector(toggleSounds(_:)),
+                                keyEquivalent: "")
+        sounds.target = self
+        sounds.state = Presence.shared.soundsOn ? .on : .off
+        menu.addItem(sounds)
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Glance", action: #selector(quitApp), keyEquivalent: "q")
         quit.target = self
@@ -181,11 +209,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SpeechSwitch.shared.on.toggle()
     }
 
+    @objc private func toggleHandsFree(_ sender: NSMenuItem) {
+        guard let handsFree = handsFree else { return }
+        if handsFree.isRunning {
+            handsFree.stop()
+        } else {
+            _ = handsFree.start()
+        }
+        sender.state = handsFree.isRunning ? .on : .off
+    }
+
+    @objc private func toggleSounds(_ sender: NSMenuItem) {
+        Presence.shared.soundsOn.toggle()
+        sender.state = Presence.shared.soundsOn ? .on : .off
+    }
+
     @objc private func quitApp() {
         NSApp.terminate(nil)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        handsFree?.stop()
         glance?.shutDown()
         brain?.stop()
     }
@@ -267,7 +311,7 @@ final class LocalTasks: @unchecked Sendable {
 
 /// Runs commands: talk key → Muse Voice → Muse Spark → action. Each command is a task of its own, so you can
 /// point at the next window and talk while the last one still works. Background threads; UI on the main thread.
-final class Glance: @unchecked Sendable {
+final class Glance: HandsFreeHost, @unchecked Sendable {
     let tasks = LocalTasks()
     private let key: String
     private let agent: Agent
@@ -290,6 +334,9 @@ final class Glance: @unchecked Sendable {
     private let brain: BrainLink?
     private let tips: QuestionTips?
     private var keyBrain: BrainCommand?
+    /// Every spoken command's words pass through here first (hands-free: "thanks, Glance" ends the session); nil
+    /// drops the command. Set once at start.
+    var transform: ((String) -> String?)?
 
     init(key: String, micAllowed: Bool, speak: Bool, ui: Highlighter, brain: BrainLink?, tips: QuestionTips?) {
         self.key = key
@@ -320,7 +367,7 @@ final class Glance: @unchecked Sendable {
     // MARK: - Voice sessions
 
     /// Hands out the waiting voice session (or a new one if it closed) and opens the next one right away.
-    private func takeVoice() -> VoiceSession {
+    func takeVoice() -> VoiceSession {
         lock.lock()
         defer { lock.unlock() }
         var session = spare
@@ -357,7 +404,8 @@ final class Glance: @unchecked Sendable {
 
     // MARK: - Talk key (runs on the key's queue)
 
-    func keyDown() {
+    /// The talk key went down, or hands-free heard you start talking (then `feed` brings the audio).
+    func keyDown(feed: AudioFeed? = nil) {
         guard micAllowed else { return }
         lock.lock()
         keyHeld = true
@@ -369,7 +417,7 @@ final class Glance: @unchecked Sendable {
             let tip = tips?.taskUnderPointer()
             let window = AttentionBox.shared.get().window ?? WindowLocator.windowUnderPointer()
             if tip != nil || window.map(FigmaPointer.isFigma) == true {
-                startBrainCommand(window: window, answerTo: tip)
+                startBrainCommand(window: window, answerTo: tip, feed: feed)
                 return
             }
         }
@@ -395,7 +443,7 @@ final class Glance: @unchecked Sendable {
             self?.onMain { $0.heard(partial) }
         }
         do {
-            try session.startTalking()
+            try session.startTalking(feed: feed)
         } catch {
             print("\nCould not start the microphone: \(error)")
             session.close()
@@ -426,7 +474,7 @@ final class Glance: @unchecked Sendable {
         }
     }
 
-    private func startBrainCommand(window: TargetWindow?, answerTo: String?) {
+    private func startBrainCommand(window: TargetWindow?, answerTo: String?, feed: AudioFeed?) {
         stopSpeaking()
         let command = BrainCommand(id: UUID().uuidString, answerTo: answerTo)
         if answerTo == nil {
@@ -441,7 +489,7 @@ final class Glance: @unchecked Sendable {
             self?.onMain { $0.heard(partial) }
         }
         do {
-            try session.startTalking()
+            try session.startTalking(feed: feed)
         } catch {
             print("\nCould not start the microphone: \(error)")
             session.close()
@@ -477,7 +525,10 @@ final class Glance: @unchecked Sendable {
                 Glance.prompt()
                 return
             }
-            let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            var said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if command.answerTo == nil, !said.isEmpty, let transform = self.transform {
+                said = transform(said)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            }
             if said.isEmpty {
                 self.onMain { $0.finish(nil) }
                 Glance.prompt()
@@ -522,7 +573,7 @@ final class Glance: @unchecked Sendable {
                 return
             }
             let stoppedAt = Date()
-            let text: String
+            var text: String
             do {
                 text = try await session.stopTalking()
                 print(String(format: "\nYou said: \"%@\"  (text ready %.1f s after you let go)",
@@ -537,6 +588,9 @@ final class Glance: @unchecked Sendable {
                 self.answerByVoice(text)
                 return
             }
+            if !text.trimmingCharacters(in: .whitespaces).isEmpty, let transform = self.transform {
+                text = transform(text) ?? ""
+            }
             if text.trimmingCharacters(in: .whitespaces).isEmpty {
                 self.onMain { $0.finish(nil) }
                 Glance.prompt()
@@ -550,6 +604,44 @@ final class Glance: @unchecked Sendable {
             await self.run(text, on: target, pointed: element, nearby: nearby, taskId: id)
             Glance.prompt()
         }
+    }
+
+    /// Drops what is being said without running it (Esc during a hands-free session).
+    func cancelHeld() {
+        lock.lock()
+        let session = keySession
+        keySession = nil
+        keyBrain = nil
+        keyHeld = false
+        lock.unlock()
+        guard let s = session else { return }
+        s.close()
+        onMain { $0.finish(nil) }
+    }
+
+    /// Hands-free, waiting for "Hey Glance": one utterance, only transcribed.
+    func transcribe(_ feed: AudioFeed, onPartial: @escaping (String) -> Void) -> Transcription? {
+        let session = takeVoice()
+        session.onPartial = onPartial
+        do {
+            try session.startTalking(feed: feed)
+        } catch {
+            session.close()
+            return nil
+        }
+        return session
+    }
+
+    /// Whether Glance is reading something aloud (hands-free does not listen to Glance's own voice).
+    var isSpeaking: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return speaker?.isRunning == true
+    }
+
+    /// Main thread: a hands-free session started or ended.
+    func handsFreeChanged(_ on: Bool) {
+        if on { stopSpeaking() }
     }
 
     // MARK: - Yes / no

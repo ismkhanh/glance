@@ -231,8 +231,9 @@ final class Toast {
 
 // MARK: - Mascot
 
-/// Glance's mascot: a round friend with one big eye that glances at your pointer. Click it for the task list;
-/// drag it anywhere. The badge counts running tasks (orange when one is waiting for your answer).
+/// Glance's mascot: a round friend with one big eye. The eye is closed while Glance is not listening, and opens and
+/// glances at your pointer while it is (talk key held, or a hands-free session). Click it for the task list; drag it
+/// anywhere. The badge counts running tasks (orange when one is waiting for your answer).
 final class MascotModel {
     static let shared = MascotModel()
     var onClick: (() -> Void)?
@@ -240,6 +241,7 @@ final class MascotModel {
     var running = 0
     var asking = false
     var connected = false
+    var awake = false                    // Glance is listening
     var blinking = false
     var dragStart: NSPoint?
     var moved = false
@@ -261,7 +263,18 @@ final class MascotView: NSView {
 
         let eyeCenter = NSPoint(x: b.midX, y: b.midY + b.height * 0.04)
         let eyeR = b.width * 0.30
-        if m.blinking {
+        if !m.awake {
+            // Asleep: a closed eye, curved like a smile.
+            let lid = NSBezierPath()
+            lid.move(to: NSPoint(x: eyeCenter.x - eyeR * 0.8, y: eyeCenter.y + eyeR * 0.1))
+            lid.curve(to: NSPoint(x: eyeCenter.x + eyeR * 0.8, y: eyeCenter.y + eyeR * 0.1),
+                      controlPoint1: NSPoint(x: eyeCenter.x - eyeR * 0.4, y: eyeCenter.y - eyeR * 0.45),
+                      controlPoint2: NSPoint(x: eyeCenter.x + eyeR * 0.4, y: eyeCenter.y - eyeR * 0.45))
+            lid.lineWidth = 3
+            lid.lineCapStyle = .round
+            NSColor.white.setStroke()
+            lid.stroke()
+        } else if m.blinking {
             let lid = NSBezierPath()
             lid.move(to: NSPoint(x: eyeCenter.x - eyeR, y: eyeCenter.y))
             lid.line(to: NSPoint(x: eyeCenter.x + eyeR, y: eyeCenter.y))

@@ -5,9 +5,9 @@ across many windows: coding agents in four terminals, a browser, a design file.
 
 Talking to all of that still starts with clicks. Most dictation tools (Whisper apps, macOS Dictation) turn speech into
 text where the keyboard focus is: you click into the window, click into the field, then speak, and they type for you.
-Glance removes the click. Point at a window, hold ⌥ and say what you want: the pointer says where, your words say
-what, and Muse acts inside that window. Every command is its own task, so you point at the next window and talk while
-the first one works.
+Glance removes the click. Point at a window, hold ⌥ (or say "Hey Glance" once) and say what you want: the pointer says
+where, your words say what, and Muse acts inside that window. Every command is its own task, so you point at the next
+window and talk while the first one works.
 
 ![Four terminals, four spoken commands, all running at once](docs/terminals.gif)
 <sub>Four terminals, four spoken commands, all running at once (from the demo video, 2× speed).</sub>
@@ -110,7 +110,10 @@ Point at anything with the mouse, or with your head (macOS Head Pointer on):
 - **Hold Left Option** from any app, speak, and let go. The glow locks on the window when you press the key, and is
   free again as soon as you let go: the command becomes a task with its own card on that window, and you can point at
   the next window and talk while it works.
-- Click the **mascot** (bottom right) for the list of tasks and their results. 🔊/🔇 in the list (or ◉ Glance >
+- The **mascot** (bottom right) shows whether Glance can hear you: its eye is closed while Glance isn't listening, and
+  opens and follows your pointer while it is. A short sound marks the start and the end (◉ Glance > "Sounds when
+  Glance starts and stops listening" turns them off).
+- Click the **mascot** for the list of tasks and their results. 🔊/🔇 in the list (or ◉ Glance >
   "Read results aloud") switches spoken results on and off; `--say` starts with them on.
 - Or type a command in the terminal and press Enter.
 - When Glance needs your yes (typing into a terminal, Send/Delete buttons, closing a tab): hold the key and say
@@ -134,6 +137,22 @@ Try with the pointer on a button: "click this", "what does this do?". On a parag
 | YouTube / YouTube Music tab | "pause", "next song", "volume 30" | JavaScript on the video in that tab |
 | Music, Spotify | "pause", "next", "volume 40" | AppleScript |
 | Any other app | "click Save", "turn on the dark mode checkbox", "File > New Window" | Accessibility tree: buttons, fields, menus |
+
+## Hands-free: "Hey Glance"
+
+Start with `--hey-glance`, or turn on ◉ Glance > "Listen for “Hey Glance”". Then:
+
+- Say **"Hey Glance"**. The eye opens and you hear a sound: a hands-free session has started.
+- Point at a window and talk. Each thing you say is a command for the window under the pointer when you start saying
+  it, exactly as if you held ⌥ while you spoke. Point at another window and keep talking: no "Hey Glance" again.
+- "Hey Glance, make this button green" in one breath starts the session and runs the command.
+- **Esc**, "thanks, Glance", "stop listening" or 30 s without speech ends the session: the eye closes and you hear the
+  closing sound. Yes/no questions are answered by just saying yes or no.
+
+How it listens: a voice detector on the Mac finds where speech starts and stops, learning the room's own noise level.
+While Glance waits for "Hey Glance", only speech goes to Muse Voice Transcribe, and Glance stops sending as soon as the
+first two words aren't "Hey Glance"; it drops what it heard. Glance doesn't listen to itself while it reads a result
+aloud. Holding ⌥ still works during a session, and uses the same microphone.
 
 ## Figma: parallel tasks with an orchestrator and a reviewer
 
@@ -176,6 +195,7 @@ fails is marked Failed with the reason. Cancel and Undo put the layer back exact
 | Flag or environment variable | Default | What it does |
 | --- | --- | --- |
 | `--say` | off | Read results aloud from the start (toggle later in the task list) |
+| `--hey-glance` | off | Listen for "Hey Glance" from the start (also in the ◉ Glance menu) |
 | `--talk-key <key>` | `left-option` | The key you hold to talk: `right-option`, `right-command`, `right-control` or `fn` |
 | `--gaze <port>` | off | Experimental: takes gaze points `{"x": 0…1, "y": 0…1}` over UDP from an eye tracker or headset, and moves the pointer when your gaze settles somewhere new. Not yet tried with a headset |
 | `MUSE_API_KEY` | from `.env` | The Meta Model API key (never logged or recorded) |
@@ -189,7 +209,7 @@ The tests check the code around the model. The evals check what the agents thems
 
 ```bash
 cd brain && npm test && npm run eval:replay   # 71 tests, then the recorded evals: no Figma, no key, no network
-cd .. && swift test                           # 21 tests of the app
+cd .. && swift test                           # 37 tests of the app
 ```
 
 Latest live run (Muse Spark 1.3, 3 trials per case, 4 Nov 2026; full report in
@@ -218,7 +238,8 @@ key and take about 5 minutes:
 
 ```bash
 cd brain && npm run eval                               # Figma agent and reviewer, records a new cassette
-cd .. && GLANCE_LIVE_EVAL=1 swift test --filter AgentLiveEvals   # terminal agent
+cd .. && GLANCE_LIVE_EVAL=1 swift test --filter AgentLiveEvals     # terminal agent
+GLANCE_LIVE_EVAL=1 swift test --filter HandsFreeLiveEvals           # "Hey Glance" through Muse Voice Transcribe
 ```
 
 The tests cover:
@@ -226,9 +247,11 @@ The tests cover:
   limit and concurrency cap; parallel tasks, updates while a task runs, questions, pause, edit, cancel, undo and the
   scope guard; what happens when Muse misbehaves (unknown tools, bad colors, tool calls written as text, a plugin that
   stops answering); and an end-to-end run over real sockets.
-- **The app (21 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
+- **The app (37 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
   written; reading Muse's answers; and the agent loop with a scripted Muse. A declined command is never typed, a "no"
-  stops the rest of the plan, and the loop is bounded.
+  stops the rest of the plan, and the loop is bounded. Hands-free: the voice detector on spoken clips in a quiet room
+  and next to a fan, the wake and goodbye phrases, and a whole session (wake, commands, Esc, silence, the talk key,
+  not listening to itself).
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the brain's tests, the replayed evals and the app's tests
 on every push.

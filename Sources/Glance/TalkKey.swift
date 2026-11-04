@@ -49,11 +49,14 @@ enum TalkKeyChoice: String, CaseIterable {
     }
 }
 
-/// Watches one key anywhere on the Mac (a listen-only event tap on its own thread) and reports press and release.
+/// Watches one key anywhere on the Mac (a listen-only event tap on its own thread) and reports press and release,
+/// and Esc, which ends a hands-free session. Every other key is let through untouched and never looked at.
 final class TalkKey {
+    private static let escape: Int64 = 53
     private let choice: TalkKeyChoice
     private var onDown: (() -> Void)?
     private var onUp: (() -> Void)?
+    private var onEscape: (() -> Void)?
     private var isDown = false
     private var tap: CFMachPort?
     private let queue = DispatchQueue(label: "glance.talkkey")
@@ -63,12 +66,14 @@ final class TalkKey {
     }
 
     /// Returns false when macOS does not allow watching keys (Input Monitoring is off for the terminal app).
-    func start(onDown: @escaping () -> Void, onUp: @escaping () -> Void) -> Bool {
+    func start(onDown: @escaping () -> Void, onUp: @escaping () -> Void, onEscape: (() -> Void)? = nil) -> Bool {
         self.onDown = onDown
         self.onUp = onUp
+        self.onEscape = onEscape
         if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
 
-        let mask = CGEventMask(1) << CGEventMask(CGEventType.flagsChanged.rawValue)
+        var mask = CGEventMask(1) << CGEventMask(CGEventType.flagsChanged.rawValue)
+        if onEscape != nil { mask |= CGEventMask(1) << CGEventMask(CGEventType.keyDown.rawValue) }
         let me = Unmanaged.passUnretained(self).toOpaque()
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             if let refcon = refcon {
@@ -97,6 +102,10 @@ final class TalkKey {
     private func handle(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return
+        }
+        if type == .keyDown {
+            if event.getIntegerValueField(.keyboardEventKeycode) == TalkKey.escape { queue.async { self.onEscape?() } }
             return
         }
         guard type == .flagsChanged, event.getIntegerValueField(.keyboardEventKeycode) == choice.keyCode else { return }
