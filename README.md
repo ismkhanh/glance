@@ -81,7 +81,7 @@ You need:
 - The Figma desktop app, for the Figma part.
 
 ```bash
-git clone https://github.com/seniormobiledev/glance.git
+git clone https://github.com/ismkhanh/glance.git
 cd glance
 cp .env.example .env              # then paste your key after MUSE_API_KEY=
 (cd brain && npm ci)              # the brain's one dependency (ws)
@@ -309,3 +309,7 @@ in `~/MetaAICompetition/demo-shop`, which is not in this repo.
 | `Tests/GlanceTests/` | The app's tests and its live terminal evals |
 | `Sources/GazeTest/` | The webcam gaze experiment |
 | `demo/` | The demo video's scripts, scenes and Remotion project |
+
+## License
+
+MIT, see [LICENSE](LICENSE).
