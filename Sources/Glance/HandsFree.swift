@@ -608,8 +608,9 @@ final class HandsFree: @unchecked Sendable {   // all state lives on `queue`
         let (woke, rest) = WakePhrase.split(text)
         if woke && running {
             startSession()
-            if u.sent < u.audio.count {
-                // Only its first 2 s went to be checked: now all of it is a command, where you pointed.
+            if u.sent < u.audio.count - vad.endFrames {      // (the last 800 ms are the quiet that ended it)
+                // Only its first 2 s went to be checked and words came after: all of it is a command, where you
+                // pointed.
                 startCommand(u)
             } else if !rest.isEmpty {
                 // "Hey Glance, make this red" in one breath: the rest is a command for where you pointed.

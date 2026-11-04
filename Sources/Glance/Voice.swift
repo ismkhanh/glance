@@ -271,7 +271,11 @@ final class VoiceSession: @unchecked Sendable {   // all state lives on `queue`
             self.queue.async {
                 switch result {
                 case .failure(let error):
-                    self.fail("Voice connection closed: \(error.localizedDescription)")
+                    if self.endSent {
+                        self.finish("")      // the stream had no words: the service closes it without a transcript
+                    } else {
+                        self.fail("Voice connection closed: \(error.localizedDescription)")
+                    }
                 case .success(let message):
                     if case .string(let text) = message { self.handle(text) }
                     if !self.done { self.receive() }

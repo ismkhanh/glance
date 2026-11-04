@@ -496,7 +496,8 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         } else {
             let nearby = attention.nearby
             onMain { $0.lock(locked, element, nearby) }
-            print("\nListening — talking to \(locked.appName)\(element.map { " (this = \($0.summary))" } ?? ""). Let go when you finish.")
+            print("\nListening — talking to \(locked.appName)\(element.map { " (this = \($0.summary))" } ?? "")."
+                  + (byVoice ? "" : " Let go when you finish."))
             if nearby.count >= 2 {
                 print("  \(nearby.count) clickable elements nearby are numbered on screen: say a number to pick another one.")
             }
@@ -536,7 +537,7 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
         lock.unlock()
         if let w = window { onMain { $0.lock(w, nil) } }
         print(answerTo != nil ? "\nListening — your answer to the question under the pointer." :
-              "\nListening — for the Figma layer under the pointer. Let go when you finish.")
+              "\nListening — for the Figma layer under the pointer." + (byVoice ? "" : " Let go when you finish."))
     }
 
     /// Picks the layer under the pointer for a brain command, once: Figma outlines it, the Glance Bridge plugin
@@ -638,8 +639,12 @@ final class Glance: HandsFreeHost, @unchecked Sendable {
             var text: String
             do {
                 text = try await session.stopTalking()
-                print(String(format: "\nYou said: \"%@\"  (text ready %.1f s after you let go)",
-                             text, Date().timeIntervalSince(stoppedAt)))
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    print("\n(no words heard)")
+                } else {
+                    print(String(format: "\nYou said: \"%@\"  (text ready %.1f s after you %@)",
+                                 text, Date().timeIntervalSince(stoppedAt), handsFree ? "stopped" : "let go"))
+                }
             } catch {
                 print("\nVoice error: \(error)")
                 if !answering { self.onMain { $0.finish("Sorry, I didn't catch that.") } }

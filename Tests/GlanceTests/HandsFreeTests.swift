@@ -260,6 +260,24 @@ struct HandsFreeLiveEvals {
         #expect(WakePhrase.isGoodbye(text), "heard \"\(text)\"")
     }
 
+    @Test("Noise with no words comes back as no words, not as a voice error")
+    func noWords() async throws {
+        let key = try #require(GlanceMain.museKey(), "No Muse key: set MUSE_API_KEY")
+        let session = VoiceSession(key: key)
+        session.open()
+        let feed = AudioFeed()
+        try session.startTalking(feed: feed)
+        let noise = Clip.room(seconds: 1.6, level: 300)
+        var offset = 0
+        while offset < noise.count {
+            feed.push(noise.subdata(in: offset..<min(offset + 3840, noise.count)))
+            offset += 3840
+            try await Task.sleep(nanoseconds: 80_000_000)
+        }
+        let text = try await session.stopTalking()
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "heard \"\(text)\"")
+    }
+
     @Test("Speech handed over all at once (said while “Hey Glance” was checked) goes out at the service's pace")
     func handedOverAtOnce() async throws {
         let key = try #require(GlanceMain.museKey(), "No Muse key: set MUSE_API_KEY")
@@ -510,6 +528,21 @@ final class FakeHost: HandsFreeHost, @unchecked Sendable {
         #expect(host.targets == ["look 1"])
         #expect(!host.log.contains { $0.hasPrefix("command:") })
         #expect(handsFree.isActive)
+    }
+
+    @Test("“Hey Glance” said slowly, with the 2 s check full, is not sent again as a command")
+    func slowWakeIsNotACommand() async throws {
+        let host = FakeHost([Said(text: "Hey Glance.")])
+        let handsFree = HandsFree(host: host, presence: quietPresence())
+        handsFree.startWithoutMic()
+        // A breath after the words: the utterance (with the quiet that ends it) is longer than 2 s, the words aren't.
+        play(handsFree, Clip.room(seconds: 0.6) + (try Clip.pcm("hey-glance")) + Clip.room(seconds: 0.3)
+             + Clip.room(seconds: 0.25, level: 2000) + Clip.room(seconds: 1.2))
+        #expect(await eventually { handsFree.isActive }, "\(host.log)")
+        handsFree.settle()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(host.log == ["transcribing", "finish"])
+        #expect(host.audio.isEmpty)
     }
 
     @Test("A command said after “Hey Glance” and a pause, before its transcript is back, waits and then runs")
