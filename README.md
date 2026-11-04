@@ -1,9 +1,24 @@
 # Glance
 
-**Point at it. Say it.** Glance is a macOS assistant built on Meta's Muse models. Point at a window (or a Figma layer),
-hold ⌥ and say what you want. Glance reads that window, acts inside it, and lets you move straight on: every command
-is its own task, so several windows can work at the same time. Each task shows its own card on its window and a line
-in the mascot's list, and can read its result aloud.
+**Point at it. Say it.** Glance is a macOS assistant built on Meta's Muse models, for people who work with AI all day
+across many windows: coding agents in four terminals, a browser, a design file.
+
+Talking to all of that still starts with clicks. Most dictation tools (Whisper apps, macOS Dictation) turn speech into
+text where the keyboard focus is: you click into the window, click into the field, then speak, and they type for you.
+Glance removes the click. Point at a window, hold ⌥ and say what you want: the pointer says where, your words say
+what, and Muse acts inside that window. Every command is its own task, so you point at the next window and talk while
+the first one works.
+
+![Four terminals, four spoken commands, all running at once](docs/terminals.gif)
+<sub>Four terminals, four spoken commands, all running at once (from the demo video, 2× speed).</sub>
+
+**Figma shows how far one app can go.** For designers, Glance has an agent made for Figma: point at a layer and say
+"make this button green" or "put a photo of a sunny beach here". Parallel workers change the layers, a reviewer checks
+every change, and undo is exact. The same pattern (tools for the app, a guard on what may change, a reviewer) is how
+Glance grows into other apps and use cases.
+
+![In Figma: a new heading, a Muse Image photo and a green button, each from one spoken command](docs/figma.gif)
+<sub>In Figma: a new heading, a photo painted by Muse Image, and a green button, each from one spoken command (2× speed).</sub>
 
 Built for the Meta Global AI Developer Hackathon (26 Oct – 4 Nov 2026), indie track.
 **Demo video (3 min): _link added at submission_**
@@ -16,6 +31,7 @@ Built for the Meta Global AI Developer Hackathon (26 Oct – 4 Nov 2026), indie 
 
 What makes it different from "point and ask an AI":
 
+- **No click first.** Glance works on the window under the pointer, whichever window has the keyboard.
 - **Tasks run side by side.** Point at the test terminal, ask; point at the code, ask; point at git, ask. All three run at once.
 - **Every change is checked.** In Figma a reviewer reads each change back, checks it matches your words, flags anything
   else that moved, asks Muse Spark for a second opinion, and gives the worker one retry. Undo restores the layer exactly.
