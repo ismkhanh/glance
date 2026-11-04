@@ -1,0 +1,6 @@
+[
+  {"do": "activate", "app": "com.figma.Desktop"},
+  {"do": "click", "at": [420, 559]},
+  {"do": "move", "to": [1200, 620], "ms": 400},
+  {"do": "wait", "ms": 4500}
+]

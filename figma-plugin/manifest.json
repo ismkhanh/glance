@@ -1,0 +1,14 @@
+{
+  "name": "Glance Bridge",
+  "id": "glance-bridge-dev",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "devAllowedDomains": ["ws://localhost:47800"],
+    "reasoning": "Talks to the Glance app running on this Mac, so you can change layers by pointing and speaking."
+  }
+}

@@ -1,0 +1,30 @@
+# Every push: the brain's tests, the agent evals replayed from the recording (no key, no network), and the app's tests.
+# The live evals call Muse, so they run by hand before a release: `cd brain && npm run eval`.
+name: CI
+on: [push, pull_request]
+
+jobs:
+  brain:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: brain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: brain/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Agent evals, replayed (fails on a changed prompt, any safety failure, or a pass rate under 80%)
+        run: npm run eval:replay
+
+  app:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift --version
+      - run: swift build
+      - run: swift test

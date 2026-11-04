@@ -1,0 +1,24 @@
+# the Muse key (copy .env.example to .env)
+.env
+.env.*
+!.env.example
+
+.build/
+.swiftpm/
+results/
+brain/node_modules/
+brain/evals/results/
+brain/evals/.*.log
+
+# demo recordings, generated voices and build output (demo/tts.py and demo/make-edl.py rebuild them)
+demo/.bin/
+demo/.voice/
+demo/.jobs/
+demo/takes/
+demo/logs/
+demo/audio/
+demo/test-audio/
+demo/facetest/
+demo/video/node_modules/
+demo/video/out/
+demo/video/public/

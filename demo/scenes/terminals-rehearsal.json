@@ -1,0 +1,18 @@
+[
+  {"do": "click", "at": [1657, 1004]},
+  {"do": "wait", "ms": 800},
+  {"do": "move", "to": [427, 300], "ms": 900},
+  {"do": "wait", "ms": 1200},
+  {"do": "say", "clip": "demo/audio/t01.wav"},
+  {"do": "wait", "ms": 14000},
+  {"do": "move", "to": [427, 806], "ms": 900},
+  {"do": "wait", "ms": 1200},
+  {"do": "say", "clip": "demo/audio/t02.wav"},
+  {"do": "wait", "ms": 9000},
+  {"do": "say", "clip": "demo/audio/t03.wav"},
+  {"do": "wait", "ms": 6000},
+  {"do": "move", "to": [1280, 806], "ms": 900},
+  {"do": "wait", "ms": 1200},
+  {"do": "say", "clip": "demo/audio/t04.wav"},
+  {"do": "wait", "ms": 10000}
+]

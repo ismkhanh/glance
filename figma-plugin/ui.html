@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 12px 14px;
+    font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    color: var(--figma-color-text, #222); background: var(--figma-color-bg, #fff);
+  }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #c33; flex: none; }
+  .dot.on { background: #2a7; }
+  h1 { font-size: 13px; margin: 0; font-weight: 600; }
+  p { margin: 8px 0 0; color: var(--figma-color-text-secondary, #666); }
+  code { font: 11px ui-monospace, Menlo, monospace; }
+  button {
+    margin-top: 12px; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    font: 500 11px -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+    color: var(--figma-color-text, #222); background: var(--figma-color-bg-secondary, #f2f2f2);
+    border: 1px solid var(--figma-color-border, #ddd);
+  }
+</style>
+</head>
+<body>
+  <div class="row"><span id="dot" class="dot"></span><h1 id="title">Looking for Glance…</h1></div>
+  <p id="info">Start Glance on this Mac. Keep this window open while you talk to Figma.</p>
+  <button id="demo" title="Adds a small travel app screen to this page">Build demo screen</button>
+<script>
+  // Relays messages between the Glance brain (WebSocket) and the plugin code (code.js).
+  var URL_ = 'ws://localhost:47800/figma';
+  var ws = null;
+  var dot = document.getElementById('dot');
+  var title = document.getElementById('title');
+  var info = document.getElementById('info');
+  var calls = 0;
+
+  function connect() {
+    try { ws = new WebSocket(URL_); } catch (e) { setTimeout(connect, 2000); return; }
+    ws.onopen = function () {
+      dot.className = 'dot on';
+      title.textContent = 'Connected to Glance';
+      info.textContent = 'Point at a layer, hold the talk key and speak.';
+      parent.postMessage({ pluginMessage: { type: 'ui-connected' } }, '*');
+    };
+    ws.onmessage = function (event) {
+      var msg;
+      try { msg = JSON.parse(event.data); } catch (e) { return; }
+      if (msg.type === 'call') {
+        calls += 1;
+        info.textContent = 'Changes made by Glance: ' + calls + ' (last: ' + msg.op + ')';
+      }
+      parent.postMessage({ pluginMessage: msg }, '*');
+    };
+    ws.onclose = function () {
+      dot.className = 'dot';
+      title.textContent = 'Looking for Glance…';
+      info.innerHTML = 'Start Glance on this Mac (it listens on <code>localhost:47800</code>).';
+      setTimeout(connect, 1500);
+    };
+    ws.onerror = function () { /* onclose follows and retries */ };
+  }
+
+  document.getElementById('demo').onclick = function () {
+    parent.postMessage({ pluginMessage: { type: 'build-demo' } }, '*');
+  };
+
+  window.onmessage = function (event) {
+    var msg = event.data && event.data.pluginMessage;
+    if (msg && ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  };
+
+  connect();
+</script>
+</body>
+</html>

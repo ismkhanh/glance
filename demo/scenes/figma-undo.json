@@ -1,0 +1,12 @@
+[
+  {"do": "wait", "ms": 800},
+  {"do": "move", "to": [1347, 605], "ms": 900},
+  {"do": "wait", "ms": 700},
+  {"do": "mark", "name": "undo"},
+  {"do": "click", "at": [1347, 605]},
+  {"do": "wait", "ms": 3500},
+  {"do": "click", "at": [1657, 1004]},
+  {"do": "move", "to": [1200, 620], "ms": 700},
+  {"do": "wait", "ms": 1500},
+  {"do": "shot", "name": "after-undo"}
+]

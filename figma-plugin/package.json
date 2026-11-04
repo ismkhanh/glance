@@ -1,0 +1,4 @@
+{
+  "//": "Figma ignores this file. It only tells Node (the brain tests) that code.js is a plain script.",
+  "type": "commonjs"
+}

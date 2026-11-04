@@ -1,0 +1,6 @@
+[
+ {"id": "t_narr_heart", "voice": "af_heart", "text": "Your eyes are already on the thing you want to change. Glance lets you point at it, and just say it."},
+ {"id": "t_narr_michael", "voice": "am_michael", "text": "Your eyes are already on the thing you want to change. Glance lets you point at it, and just say it."},
+ {"id": "t_cmd_red", "voice": "am_michael", "text": "Turn it red."},
+ {"id": "t_cmd_scroll", "voice": "am_michael", "text": "Make it scrollable."}
+]

@@ -1,0 +1,592 @@
+{
+ "fps": 30,
+ "acts": [
+  {
+   "kind": "title",
+   "dur": 11.51,
+   "say": "n01",
+   "audio": [
+    {
+     "file": "audio/n01.wav",
+     "out": 0.6,
+     "dur": 10.11,
+     "volume": 1
+    }
+   ],
+   "subtitles": [
+    {
+     "text": "Every app makes you hunt for the right window, the right panel, the right button. But your attention is already on the thing you want to change. So why not just point at it, and say it?",
+     "out": 0.6,
+     "dur": 10.11
+    }
+   ]
+  },
+  {
+   "kind": "screen",
+   "video": "terminals.mp4",
+   "chapter": "Four terminals, four tasks at once",
+   "dur": 49.72294986724854,
+   "segments": [
+    {
+     "kind": "hold",
+     "src": 2.712566040588379,
+     "out": 0.0,
+     "dur": 5.2,
+     "speed": 1,
+     "video": "terminals.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 2.712566040588379,
+     "out": 5.2,
+     "dur": 16.07899994850159,
+     "speed": 1.0,
+     "video": "terminals.mp4"
+    },
+    {
+     "kind": "hold",
+     "src": 18.791565989089968,
+     "out": 21.27899994850159,
+     "dur": 9.180000000000001,
+     "speed": 1,
+     "video": "terminals.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 18.791565989089968,
+     "out": 30.458999948501592,
+     "dur": 8.814999961853026,
+     "speed": 1.0,
+     "video": "terminals.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 27.606565950942993,
+     "out": 39.27399991035462,
+     "dur": 4.048949956893921,
+     "speed": 2.0,
+     "video": "terminals.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 35.704465864730835,
+     "out": 43.32294986724854,
+     "dur": 6.399999999999999,
+     "speed": 1.0,
+     "video": "terminals.mp4"
+    }
+   ],
+   "audio": [
+    {
+     "file": "audio/a01.wav",
+     "out": 0.2,
+     "dur": 4.74,
+     "volume": 1
+    },
+    {
+     "file": "audio/t01.wav",
+     "out": 6.800000000000001,
+     "dur": 1.73,
+     "volume": 1
+    },
+    {
+     "file": "audio/t06.wav",
+     "out": 10.426999855041505,
+     "dur": 1.54,
+     "volume": 1
+    },
+    {
+     "file": "audio/t05.wav",
+     "out": 13.862999963760377,
+     "dur": 1.9,
+     "volume": 1
+    },
+    {
+     "file": "audio/t02.wav",
+     "out": 17.678999948501588,
+     "dur": 2.62,
+     "volume": 1
+    },
+    {
+     "file": "audio/a02.wav",
+     "out": 21.57899994850159,
+     "dur": 8.38,
+     "volume": 1
+    },
+    {
+     "file": "audio/a04.wav",
+     "out": 35.17399991035462,
+     "dur": 2.84,
+     "volume": 1
+    },
+    {
+     "file": "audio/t03.wav",
+     "out": 38.27399991035462,
+     "dur": 0.75,
+     "volume": 1
+    },
+    {
+     "file": "audio/a05.wav",
+     "out": 43.92294986724854,
+     "dur": 5.55,
+     "volume": 1
+    }
+   ],
+   "captions": [
+    {
+     "text": "Why is this test failing?",
+     "out": 6.800000000000001,
+     "dur": 2.9299999999999997
+    },
+    {
+     "text": "Where's the bug in this code?",
+     "out": 10.426999855041505,
+     "dur": 2.74
+    },
+    {
+     "text": "What's the status of this server?",
+     "out": 13.862999963760377,
+     "dur": 3.0999999999999996
+    },
+    {
+     "text": "Commit these changes with a short message.",
+     "out": 17.678999948501588,
+     "dur": 3.8200000000000003
+    },
+    {
+     "text": "Yes.",
+     "out": 38.27399991035462,
+     "dur": 2.4
+    }
+   ],
+   "subtitles": [
+    {
+     "text": "Four terminals, four different jobs. I point at one, hold Option, and ask.",
+     "out": 0.2,
+     "dur": 4.74
+    },
+    {
+     "text": "They all run at once. One reads the failing test. Another reads the code, and finds the real bug: the discount is applied twice.",
+     "out": 21.57899994850159,
+     "dur": 8.38
+    },
+    {
+     "text": "Anything that types into a terminal waits for my yes.",
+     "out": 35.17399991035462,
+     "dur": 2.84
+    },
+    {
+     "text": "Every task lands in the mascot's list, and Glance can read each result aloud as it finishes.",
+     "out": 43.92294986724854,
+     "dur": 5.55
+    }
+   ],
+   "cameras": [
+    {
+     "out": 0,
+     "x": 855,
+     "y": 551,
+     "w": 1710,
+     "ease": 0.8
+    },
+    {
+     "out": 22.87899994850159,
+     "x": 430,
+     "y": 230,
+     "w": 1000,
+     "ease": 0.8
+    },
+    {
+     "out": 25.878999948501587,
+     "x": 1290,
+     "y": 640,
+     "w": 1000,
+     "ease": 0.8
+    },
+    {
+     "out": 30.25899994850159,
+     "x": 855,
+     "y": 551,
+     "w": 1710,
+     "ease": 0.8
+    },
+    {
+     "out": 34.87399991035462,
+     "x": 430,
+     "y": 700,
+     "w": 1100,
+     "ease": 0.8
+    },
+    {
+     "out": 43.72294986724854,
+     "x": 1380,
+     "y": 880,
+     "w": 1000,
+     "ease": 0.8
+    }
+   ]
+  },
+  {
+   "kind": "screen",
+   "video": "figma.mp4",
+   "chapter": "Inside an app: the exact layer",
+   "dur": 87.82639198303222,
+   "segments": [
+    {
+     "kind": "hold",
+     "src": 3.9384108529815665,
+     "out": 0.0,
+     "dur": 4.2,
+     "speed": 1,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 3.9384108529815665,
+     "out": 4.2,
+     "dur": 3.8999999999999995,
+     "speed": 1.0,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "hold",
+     "src": 7.838410852981566,
+     "out": 8.1,
+     "dur": 8.69,
+     "speed": 1,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 7.838410852981566,
+     "out": 16.79,
+     "dur": 2.700000000000001,
+     "speed": 1.0,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "hold",
+     "src": 10.538410852981567,
+     "out": 19.490000000000002,
+     "dur": 5.45,
+     "speed": 1,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 10.538410852981567,
+     "out": 24.94,
+     "dur": 5.399999999999999,
+     "speed": 1.0,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "hold",
+     "src": 15.938410852981566,
+     "out": 30.34,
+     "dur": 5.68,
+     "speed": 1,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 15.938410852981566,
+     "out": 36.019999999999996,
+     "dur": 21.100000000000005,
+     "speed": 1.0,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 37.03841085298157,
+     "out": 57.120000000000005,
+     "dur": 1.3999999999999986,
+     "speed": 2.0,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 39.83841085298157,
+     "out": 58.52,
+     "dur": 3.5263919830322266,
+     "speed": 1.0,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "hold",
+     "src": 43.364802836013794,
+     "out": 62.04639198303223,
+     "dur": 15.98,
+     "speed": 1,
+     "video": "figma.mp4"
+    },
+    {
+     "kind": "hold",
+     "src": 1.3372169803466805,
+     "out": 78.02639198303223,
+     "dur": 2.2,
+     "speed": 1,
+     "video": "figma-undo.mp4"
+    },
+    {
+     "kind": "play",
+     "src": 1.3372169803466805,
+     "out": 80.22639198303223,
+     "dur": 7.6,
+     "speed": 1.0,
+     "video": "figma-undo.mp4"
+    }
+   ],
+   "audio": [
+    {
+     "file": "audio/n02.wav",
+     "out": 0.2,
+     "dur": 6.21,
+     "volume": 1
+    },
+    {
+     "file": "audio/c01.wav",
+     "out": 6.5,
+     "dur": 1.45,
+     "volume": 1
+    },
+    {
+     "file": "audio/n03.wav",
+     "out": 8.4,
+     "dur": 8.09,
+     "volume": 1
+    },
+    {
+     "file": "audio/n04.wav",
+     "out": 19.69,
+     "dur": 4.95,
+     "volume": 1
+    },
+    {
+     "file": "audio/c02.wav",
+     "out": 26.588999881744385,
+     "dur": 1.88,
+     "volume": 1
+    },
+    {
+     "file": "audio/n05.wav",
+     "out": 30.54,
+     "dur": 5.18,
+     "volume": 1
+    },
+    {
+     "file": "audio/c04.wav",
+     "out": 37.661000080108636,
+     "dur": 1.71,
+     "volume": 1
+    },
+    {
+     "file": "audio/c05.wav",
+     "out": 42.74700004577636,
+     "dur": 2.03,
+     "volume": 1
+    },
+    {
+     "file": "audio/c06.wav",
+     "out": 48.27099997520446,
+     "dur": 2.58,
+     "volume": 1
+    },
+    {
+     "file": "audio/n06.wav",
+     "out": 51.019999999999996,
+     "dur": 5.82,
+     "volume": 1
+    },
+    {
+     "file": "audio/n07.wav",
+     "out": 62.24639198303223,
+     "dur": 15.38,
+     "volume": 1
+    },
+    {
+     "file": "audio/n08.wav",
+     "out": 78.22639198303223,
+     "dur": 7.94,
+     "volume": 1
+    }
+   ],
+   "captions": [
+    {
+     "text": "Make this button red.",
+     "out": 6.5,
+     "dur": 2.65
+    },
+    {
+     "text": "Make these cards scrollable.",
+     "out": 26.588999881744385,
+     "dur": 3.08
+    },
+    {
+     "text": "Actually, make it green.",
+     "out": 37.661000080108636,
+     "dur": 2.91
+    },
+    {
+     "text": "Put a photo of a sunny beach here.",
+     "out": 42.74700004577636,
+     "dur": 3.2299999999999995
+    },
+    {
+     "text": "Change this heading to Weekend in Lisbon.",
+     "out": 48.27099997520446,
+     "dur": 3.7800000000000002
+    }
+   ],
+   "subtitles": [
+    {
+     "text": "Inside an app, the pointer picks the exact thing. Here's Figma. I point at the button, hold Option, and talk.",
+     "out": 0.2,
+     "dur": 6.21
+    },
+    {
+     "text": "Glance doesn't guess what this means. It asks Figma to select the layer under my pointer, so I can see exactly what my words will change.",
+     "out": 8.4,
+     "dur": 8.09
+    },
+    {
+     "text": "I don't wait for it. Each command becomes its own task, and they all run in parallel.",
+     "out": 19.69,
+     "dur": 4.95
+    },
+    {
+     "text": "Changed my mind? Pointing at the same layer again joins the task that's already there.",
+     "out": 30.54,
+     "dur": 5.18
+    },
+    {
+     "text": "Workers can call Muse Image too. It paints the picture, and Glance drops it straight into the layer.",
+     "out": 51.019999999999996,
+     "dur": 5.82
+    },
+    {
+     "text": "Nothing counts as done until the reviewer checks it. It reads every change back from Figma, makes sure it matches my words, flags anything else that moved, and asks Muse Spark for a second opinion. If the check fails, the worker gets one more try.",
+     "out": 62.24639198303223,
+     "dur": 15.38
+    },
+    {
+     "text": "Every task lives behind the mascot. I can pause, edit, or cancel. And undo puts the layer back exactly the way it was.",
+     "out": 78.22639198303223,
+     "dur": 7.94
+    }
+   ],
+   "cameras": [
+    {
+     "out": 0,
+     "x": 855,
+     "y": 551,
+     "w": 1710,
+     "ease": 0.8
+    },
+    {
+     "out": 8.299999999999999,
+     "x": 760,
+     "y": 860,
+     "w": 900,
+     "ease": 0.8
+    },
+    {
+     "out": 16.389999999999997,
+     "x": 855,
+     "y": 551,
+     "w": 1710,
+     "ease": 0.8
+    },
+    {
+     "out": 30.54,
+     "x": 820,
+     "y": 700,
+     "w": 1100,
+     "ease": 0.8
+    },
+    {
+     "out": 35.72,
+     "x": 855,
+     "y": 551,
+     "w": 1710,
+     "ease": 0.8
+    },
+    {
+     "out": 49.92,
+     "x": 882,
+     "y": 520,
+     "w": 1100,
+     "ease": 0.8
+    },
+    {
+     "out": 57.22,
+     "x": 855,
+     "y": 551,
+     "w": 1710,
+     "ease": 0.8
+    },
+    {
+     "out": 61.04639198303223,
+     "x": 1360,
+     "y": 650,
+     "w": 700,
+     "ease": 1.2
+    },
+    {
+     "out": 69.54639198303224,
+     "x": 1360,
+     "y": 800,
+     "w": 700,
+     "ease": 6.0
+    },
+    {
+     "out": 78.02639198303223,
+     "x": 1000,
+     "y": 440,
+     "w": 1450,
+     "ease": 1.0
+    }
+   ]
+  },
+  {
+   "kind": "architecture",
+   "dur": 19.97,
+   "say": "n09",
+   "audio": [
+    {
+     "file": "audio/n09.wav",
+     "out": 0.6,
+     "dur": 18.77,
+     "volume": 1
+    }
+   ],
+   "subtitles": [
+    {
+     "text": "Under the hood, Muse Voice Transcribe turns speech into text in real time. Muse Spark reads the window you point at and acts through tools, one task per command, side by side. In Figma, workers run Muse Spark tool loops, Muse Image paints, and a reviewer checks every change before it counts.",
+     "out": 0.6,
+     "dur": 18.77
+    }
+   ]
+  },
+  {
+   "kind": "close",
+   "dur": 9.75,
+   "say": "n10",
+   "audio": [
+    {
+     "file": "audio/n10.wav",
+     "out": 0.6,
+     "dur": 7.15,
+     "volume": 1
+    }
+   ],
+   "subtitles": [
+    {
+     "text": "Glance doesn't care how you point: a mouse, macOS head pointer, or an eye tracker. Glance. Point at it, and say it.",
+     "out": 0.6,
+     "dur": 7.15
+    }
+   ]
+  }
+ ]
+}

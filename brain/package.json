@@ -1,0 +1,18 @@
+{
+  "name": "glance-brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Glance brain: orchestrator, parallel workers and reviewer for commands you speak at Figma layers.",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "eval": "node evals/run.js --live",
+    "eval:replay": "node evals/run.js --replay"
+  },
+  "engines": { "node": ">=20.3" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

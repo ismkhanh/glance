@@ -1,0 +1,12 @@
+# Quiet prompt for the demo terminals: folder and arrow only, no slow modules.
+command_timeout = 5000
+add_newline = false
+format = "$directory$character"
+
+[directory]
+truncation_length = 1
+style = "bold cyan"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"

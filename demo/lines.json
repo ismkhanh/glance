@@ -1,0 +1,137 @@
+[
+ {
+  "id": "n01",
+  "voice": "af_heart",
+  "text": "Every app makes you hunt for the right window, the right panel, the right button. But your attention is already on the thing you want to change. So why not just point at it, and say it?"
+ },
+ {
+  "id": "a01",
+  "voice": "af_heart",
+  "text": "Four terminals, four different jobs. I point at one, hold Option, and ask."
+ },
+ {
+  "id": "a02",
+  "voice": "af_heart",
+  "text": "They all run at once. One reads the failing test. Another reads the code, and finds the real bug: the discount is applied twice."
+ },
+ {
+  "id": "a03",
+  "voice": "af_heart",
+  "text": "One reads the failing test. Another reads the code, and finds the real bug: the discount is applied twice."
+ },
+ {
+  "id": "a04",
+  "voice": "af_heart",
+  "text": "Anything that types into a terminal waits for my yes."
+ },
+ {
+  "id": "a05",
+  "voice": "af_heart",
+  "text": "Every task lands in the mascot's list, and Glance can read each result aloud as it finishes."
+ },
+ {
+  "id": "n02",
+  "voice": "af_heart",
+  "text": "Inside an app, the pointer picks the exact thing. Here's Figma. I point at the button, hold Option, and talk."
+ },
+ {
+  "id": "n03",
+  "voice": "af_heart",
+  "text": "Glance doesn't guess what this means. It asks Figma to select the layer under my pointer, so I can see exactly what my words will change."
+ },
+ {
+  "id": "n04",
+  "voice": "af_heart",
+  "text": "I don't wait for it. Each command becomes its own task, and they all run in parallel."
+ },
+ {
+  "id": "n05",
+  "voice": "af_heart",
+  "text": "Changed my mind? Pointing at the same layer again joins the task that's already there."
+ },
+ {
+  "id": "n06",
+  "voice": "af_heart",
+  "text": "Workers can call Muse Image too. It paints the picture, and Glance drops it straight into the layer."
+ },
+ {
+  "id": "n07",
+  "voice": "af_heart",
+  "text": "Nothing counts as done until the reviewer checks it. It reads every change back from Figma, makes sure it matches my words, flags anything else that moved, and asks Muse Spark for a second opinion. If the check fails, the worker gets one more try."
+ },
+ {
+  "id": "n08",
+  "voice": "af_heart",
+  "text": "Every task lives behind the mascot. I can pause, edit, or cancel. And undo puts the layer back exactly the way it was."
+ },
+ {
+  "id": "n09",
+  "voice": "af_heart",
+  "text": "Under the hood, Muse Voice Transcribe turns speech into text in real time. Muse Spark reads the window you point at and acts through tools, one task per command, side by side. In Figma, workers run Muse Spark tool loops, Muse Image paints, and a reviewer checks every change before it counts."
+ },
+ {
+  "id": "n10",
+  "voice": "af_heart",
+  "text": "Glance doesn't care how you point: a mouse, macOS head pointer, or an eye tracker. Glance. Point at it, and say it."
+ },
+ {
+  "id": "c01",
+  "voice": "am_michael",
+  "text": "Make this button red."
+ },
+ {
+  "id": "c02",
+  "voice": "am_michael",
+  "text": "Make these cards scrollable."
+ },
+ {
+  "id": "c03",
+  "voice": "am_michael",
+  "text": "Horizontal."
+ },
+ {
+  "id": "c04",
+  "voice": "am_michael",
+  "text": "Actually, make it green."
+ },
+ {
+  "id": "c05",
+  "voice": "am_michael",
+  "text": "Put a photo of a sunny beach here."
+ },
+ {
+  "id": "c06",
+  "voice": "am_michael",
+  "text": "Change this heading to Weekend in Lisbon."
+ },
+ {
+  "id": "t01",
+  "voice": "am_michael",
+  "text": "Why is this test failing?"
+ },
+ {
+  "id": "t02",
+  "voice": "am_michael",
+  "text": "Commit these changes with a short message."
+ },
+ {
+  "id": "t03",
+  "voice": "am_michael",
+  "text": "Yes."
+ },
+ {
+  "id": "t04",
+  "voice": "am_michael",
+  "text": "Open a new tab and search for the Node test runner docs."
+ },
+ {
+  "id": "t05",
+  "voice": "am_michael",
+  "text": "What's the status of this server?"
+ },
+ {
+  "id": "t06",
+  "voice": "am_michael",
+  "text": "Where's the bug in this code?"
+ }
+]
