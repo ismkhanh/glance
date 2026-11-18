@@ -1,9 +1,42 @@
 # Glance
 
-> **New: [Glance VR](vr/README.md)** puts your Mac's windows around you as floating panels on Meta Quest. Look at a
-> window, pinch to click, point to scroll, grab to move. No controller, mouse or keyboard. Built for the Meta VR Start
-> Developer Competition 2026. [Demo video](https://www.youtube.com/watch?v=RoXALA7M2vg) ·
-> [Setup](vr/README.md#quick-start) · [Devpost](https://devpost.com/software/glance-vr)
+## 🥽 Glance VR: your Mac's windows, floating around you on Meta Quest
+
+Every open window on your Mac becomes its own floating panel in your Quest, with passthrough so you still see your
+room. **Look** at a window to select it, then use your **hands**. No controller, no mouse, no keyboard.
+
+**Demo video:** [youtube.com/watch?v=RoXALA7M2vg](https://www.youtube.com/watch?v=RoXALA7M2vg) ·
+**Devpost:** [devpost.com/software/glance-vr](https://devpost.com/software/glance-vr) ·
+Built for the **Meta VR Start Developer Competition 2026** (Productivity, New Experience)
+
+| Gesture | What it does |
+|---|---|
+| **Look** at a window | Highlights it and shows its name |
+| **Left hand, short pinch** (thumb + index) | Click where you look |
+| **Left hand, two quick pinches** | Open, as a double-click (e.g. a file in Finder) |
+| **Point** (fist, index finger out), move up/down | Scroll. Flick and let go to fling |
+| **Right hand, pinch and move your hand** | Move the panel |
+| **Both hands pinched**, spread / bring together | Zoom in / out |
+| **Right pinch on empty space, hold 2 s** | Bring the panels back in front of you |
+
+### Quick start
+
+You need a Mac with Apple silicon (macOS 13+), a Meta Quest 3, 3S or Pro in developer mode, and a USB-C cable.
+No accounts and no API keys.
+
+1. **Mac:** from this folder, run `swift run -c release Glance`, or double-click `Glance.command`. Allow
+   **Screen Recording** and **Accessibility** for your terminal app when macOS asks, then run it again.
+2. **Quest:** download `GlanceVR.apk` from **Releases** (or build it, see [vr/README.md](vr/README.md)). Plug in the
+   Quest, then run `cd vr && zsh cable.sh install` (or `adb install -r GlanceVR.apk`).
+3. **Open Glance VR** in the headset (Library → Unknown sources). Your Mac's windows appear around you.
+
+**More:** full setup, how to build the APK, how it works and troubleshooting are in
+**[vr/README.md](vr/README.md)**. The Quest app's code is in [`vr/headset/`](vr/headset/), and the Mac side is in
+[`Sources/Glance/`](Sources/Glance/) (`QuestHub`, `WindowRegistry`, `WindowStreamPool`, `GazeInput`).
+
+---
+
+## Glance: point at it, say it (Meta Global AI Developer Hackathon)
 
 **Point at it. Say it.** Glance is a macOS assistant built on Meta's Muse models, for people who work with AI all day
 across many windows: coding agents in four terminals, a browser, a design file.
@@ -274,18 +307,10 @@ The tests cover:
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the brain's tests, the replayed evals and the app's tests
 on every push.
 
-## Glance VR (Meta Quest): your Mac's windows as floating panels
+## Glance VR (Meta Quest)
 
-Every open Mac window becomes its own floating panel in a Meta Quest. Look at a panel to select it. Then use your
-hands: a short left pinch clicks, two quick pinches open, pointing your index finger scrolls, a right pinch grabs and
-moves a panel, and pinching with both hands zooms. Every action lands in that exact Mac window, by window ID.
-
-**Quick start:**
-1. Run `swift run -c release Glance` here. No API key is needed for Glance VR.
-2. Install `GlanceVR.apk` from Releases (or build it from `vr/`) with `cd vr && zsh cable.sh install`.
-3. Open Glance VR in the headset.
-
-Full instructions, gestures and the build: [vr/README.md](vr/README.md).
+See the [top of this README](#-glance-vr-your-macs-windows-floating-around-you-on-meta-quest) and
+[vr/README.md](vr/README.md).
 
 ## Glance Gaze (Meta Quest Pro)
 
