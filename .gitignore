@@ -1,48 +1,17 @@
-# the Muse key (copy .env.example to .env)
-.env
-.env.*
-!.env.example
-
-.build/
-.swiftpm/
-results/
-brain/node_modules/
-brain/evals/results/
-brain/evals/.*.log
-
-# demo recordings, generated voices and build output (demo/tts.py and demo/make-edl.py rebuild them)
-demo/.bin/
-demo/.voice/
-demo/.jobs/
-demo/takes/
-demo/logs/
-demo/audio/
-demo/test-audio/
-demo/facetest/
-demo/video/node_modules/
-demo/video/out/
-demo/video/public/
-
-# macOS
 .DS_Store
 
-# Glance VR (vr/): never commit the release key or build output
-vr/signing/
+# Shareable zip made by package.sh
+dist/
+
+# Mac app build output
+mac/.build/
+mac/.swiftpm/
+
+# Quest app: build output, Godot caches, and your release key (never commit it)
+quest/builds/
+quest/.godot/
+quest/android/
+quest/signing/
 *.keystore
 keystore.env
-vr/builds/
-vr/release/
-vr/headset/.godot/
-vr/headset/android/
-
-# Demo-video production files and the video itself stay on disk only; the video is on YouTube
-demo/
-docs/glance-demo.mp4
-
-# Parts not used by Glance VR (Figma brain and plugin, demo media) stay on disk only
-brain/
-figma-plugin/
-docs/demo-poster.jpg
-docs/figma.gif
-docs/terminals.gif
-vr/PROJECT.md
+.env
