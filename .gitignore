@@ -34,3 +34,7 @@ vr/builds/
 vr/release/
 vr/headset/.godot/
 vr/headset/android/
+
+# Demo-video production files and the video itself stay on disk only; the video is on YouTube
+demo/
+docs/glance-demo.mp4

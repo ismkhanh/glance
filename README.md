@@ -48,7 +48,7 @@ where, your words say what, and Muse acts inside that window. Every command is i
 window and talk while the first one works.
 
 [![Glance demo video (3 min): click to watch on YouTube](docs/demo-poster.jpg)](https://youtu.be/zzA-1mfZ__w)
-<sub>The demo video (3 min, recorded live on a Mac): click to watch on YouTube, or [download the file](docs/glance-demo.mp4).</sub>
+<sub>The demo video (3 min, recorded live on a Mac): click to watch on YouTube.</sub>
 
 ![Four terminals, four spoken commands, all running at once](docs/terminals.gif)
 <sub>Four terminals, four spoken commands, all running at once (from the demo video, 2× speed).</sub>
@@ -343,23 +343,8 @@ leave the Mac.
 | L | Live view: a ring shows where the app thinks you look |
 | Esc | Stop a step, or quit from the start screen |
 
-**Which window are you facing?** (`demo/face-eval.mjs`): Muse Spark on a webcam photo, with and without SAM 3.1. It got
+**Which window are you facing?**: Muse Spark on a webcam photo, with and without SAM 3.1. It got
 2–4 of 12 right in 15–37 s, so Glance follows the pointer instead.
-
-## Demo recording tools (demo/)
-
-How the demo video was made. Nothing is staged: the spoken commands go through the real Muse Voice Transcribe path and
-the real tasks. The scripts are a record of the recording setup: the terminal scenes expect a small sample shop project
-in `~/MetaAICompetition/demo-shop`, which is not in this repo.
-
-| File | What it does |
-| --- | --- |
-| `demo/lines.json`, `demo/tts.py` | The narration and the spoken commands, voiced with Kokoro (24 kHz, the format Muse Voice Transcribe takes) |
-| `demo/asr-check.mjs` | Streams each command clip to Muse Voice Transcribe and prints what it heard |
-| `GLANCE_DEMO_VOICE=<dir>` | Glance plays `<dir>/next` or the next line of `<dir>/queue` (a WAV path) instead of the microphone on the next key press |
-| `demo/driver.swift` | Plays a scene: moves the pointer, holds ⌥ for each clip, clicks; logs every step's time |
-| `demo/session.sh`, `demo/jobs/` | Runs recording jobs inside Terminal.app (which has the permissions): window layout, Glance, screen capture |
-| `demo/make-edl.py`, `demo/video/` | Turns the takes and logs into an edit list; Remotion renders the video with captions and zooms |
 
 ## Repository layout
 
@@ -372,7 +357,6 @@ in `~/MetaAICompetition/demo-shop`, which is not in this repo.
 | `quest/` | Glance Gaze, the Quest Pro eye-gaze app |
 | `vr/` | Glance VR, the Quest app with one floating panel per Mac window (Godot), and its build, install and packaging scripts |
 | `Sources/GazeTest/` | The webcam gaze experiment |
-| `demo/` | The demo video's scripts, scenes and Remotion project |
 
 ## License
 
