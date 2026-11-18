@@ -22,3 +22,15 @@ demo/facetest/
 demo/video/node_modules/
 demo/video/out/
 demo/video/public/
+
+# macOS
+.DS_Store
+
+# Glance VR (vr/): never commit the release key or build output
+vr/signing/
+*.keystore
+keystore.env
+vr/builds/
+vr/release/
+vr/headset/.godot/
+vr/headset/android/

@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://gaze.gd" id="1_gaze"]
+[ext_resource type="Script" path="res://desk.gd" id="1_gaze"]
 
 [sub_resource type="Environment" id="Environment_pt"]
 background_mode = 1
@@ -45,6 +45,10 @@ text = "Starting…"
 font_size = 40
 width = 900.0
 autowrap_mode = 3
+
+[node name="LeftController" type="XRController3D" parent="XROrigin3D"]
+tracker = &"left_hand"
+pose = &"aim"
 
 [node name="RightController" type="XRController3D" parent="XROrigin3D"]
 tracker = &"right_hand"

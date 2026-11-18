@@ -518,7 +518,10 @@ final class Highlighter: NSObject {
 
     /// The glow shows only while Glance listens (the talk key is held, or a hands-free session is on), so it is not
     /// in the way the rest of the time. What is under the pointer is still followed, ready for when you talk.
-    private var visible: Bool { locked != nil || Presence.shared.listening }
+    /// Glance VR: also while a headset is pointing (gaze in the last 1.5 s), so the window you look at is marked first.
+    private var visible: Bool {
+        locked != nil || Presence.shared.listening || Date().timeIntervalSince(GazeInput.lastPointedAt) < 1.5
+    }
 
     private func draw(_ window: TargetWindow?, _ element: PointedElement?) {
         guard visible else {

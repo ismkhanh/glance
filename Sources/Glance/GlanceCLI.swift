@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var speechItem: NSMenuItem?
     private var handsFreeItem: NSMenuItem?
     private var gaze: GazeInput?
+    private var quest: QuestHub?
     private var handsFree: HandsFree?
     private var escapeKey: EscapeKey?
 
@@ -55,7 +56,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         print("Glance: talk to the window under your pointer.")
         guard let key = GlanceMain.museKey() else {
             print("No MUSE_API_KEY found in the environment or in .env (run Glance from its folder; see .env.example).")
-            NSApp.terminate(nil)
+            if QuestHub.portFromArguments() != nil {
+                print("Quest Desk still runs: terminals and the screen stream work, voice does not.")
+                startQuest()
+            } else {
+                NSApp.terminate(nil)
+            }
             return
         }
         if !AX.isTrusted(prompt: true) {
@@ -114,6 +120,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             g.start(port: port)
             gaze = g
         }
+        startQuest()
+        quest?.transcriber = glance
+        if gaze == nil, quest != nil { gaze = GazeInput() }   // Glance VR over USB: gaze comes through Quest Desk only
+        quest?.onGaze = { [weak gaze = self.gaze] message in gaze?.handle(json: message) }
+        gaze?.windowResolver = { [weak quest] id in quest?.windowTarget(for: id) }
+        quest?.onAction = { [weak gaze = self.gaze] message in gaze?.handleAction(json: message) }
 
         // Hands-free ("Hey Glance") shares the microphone with the talk key, so the key goes through it first.
         let handsFree = HandsFree(host: glance)
@@ -145,6 +157,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Presence.shared.set(.key, false)
                 if !handsFree.keyUp() { glance.keyUp() }
             })
+        }
+        if micAllowed, let gaze = gaze {
+            // Glance VR: a left-hand pinch on the headset is a talk key too, so nothing on the Mac has to be pressed.
+            gaze.onTalk = { down in
+                Presence.shared.set(.key, down)
+                if down {
+                    if !handsFree.keyDown() { glance.keyDown() }
+                } else {
+                    if !handsFree.keyUp() { glance.keyUp() }
+                }
+            }
+            print("Glance VR: pinch your left thumb and finger on the headset, talk, and let go.")
         }
         if keyWorks {
             print("Hold \(choice.label) from any app, speak, and let go. Other keys: --talk-key right-option | right-command | right-control | fn")
@@ -181,6 +205,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         reader.start()
+    }
+
+    /// Quest Desk (`--quest [port]`): terminals, the screen stream and pinch to talk for the headset.
+    /// Wiring lives here (not only in the Muse-key path) so Quest-Desk-only mode still moves the pointer,
+    /// targets windows, and clicks/drag — voice just has no transcriber there.
+    private func startQuest() {
+        guard quest == nil, let port = QuestHub.portFromArguments() else { return }
+        let hub = QuestHub()
+        hub.start(port: port)
+        quest = hub
+        if gaze == nil {
+            gaze = GazeInput()
+            if let gazePort = GazeInput.portFromArguments() { gaze?.start(port: gazePort) }
+        }
+        hub.onGaze = { [weak gaze = self.gaze] message in gaze?.handle(json: message) }
+        hub.onAction = { [weak gaze = self.gaze] message in gaze?.handleAction(json: message) }
+        gaze?.windowResolver = { [weak hub] id in hub?.windowTarget(for: id) }
     }
 
     private func setUpMenu() {
@@ -243,6 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        quest?.stop()
         handsFree?.stop()
         escapeKey?.stop()
         glance?.shutDown()

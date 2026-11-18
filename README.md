@@ -208,7 +208,8 @@ fails is marked Failed with the reason. Cancel and Undo put the layer back exact
 | `--say` | off | Read results aloud from the start (toggle later in the task list) |
 | `--hey-glance` | off | Listen for "Hey Glance" from the start (also in the ◉ Glance menu) |
 | `--talk-key <key>` | `left-option` | The key you hold to talk: `right-option`, `right-command`, `right-control` or `fn` |
-| `--gaze <port>` | off | Takes gaze points `{"x": 0…1, "y": 0…1}` over UDP (from [Glance Gaze](#glance-gaze-meta-quest-pro) or any tracker), and moves the pointer when your gaze settles somewhere new |
+| `--gaze <port>` | `47810` | Takes gaze points `{"x": 0…1, "y": 0…1}` over UDP (from [Glance Gaze](#glance-gaze-meta-quest-pro) or any tracker), and moves the pointer when your gaze settles somewhere new (`--no-gaze` turns it off) |
+| `--quest <port>` | `47811` | Quest Desk for the headset: terminals, the screen stream and floating windows, found by the Quest app automatically (`--no-quest` turns it off) |
 | `MUSE_API_KEY` | from `.env` | The Meta Model API key (never logged or recorded) |
 | `GLANCE_MUSE_REVIEW` | on | `0` turns off Muse's second-opinion review (the rules alone let wrong sizes and texts through; see the evals) |
 | `GLANCE_BRAIN_DIR` | `./brain` | Where the brain is, if you run Glance from another folder |
@@ -275,8 +276,9 @@ is a Quest Pro app (Godot 4.7.2 + Meta's OpenXR vendor plugin, passthrough on) t
 Mac's screen into pointer movement. Calibrate once by touching three screen corners with the controller, then look at
 a window, hold Option and talk.
 
-- Mac side: `swift run -c release Glance --gaze 47810` listens for the gaze points, smooths them and moves the pointer
-  only when your gaze settles somewhere new (`Sources/Glance/GazeInput.swift`).
+- Mac side: just launch Glance (`Glance.command`, or `swift run -c release Glance`). It listens for the gaze points,
+  smooths them and moves the pointer only when your gaze settles somewhere new (`Sources/Glance/GazeInput.swift`),
+  and the Quest app finds it by itself — launch the app, then open the app on the headset.
 - Headset side: OpenXR `XR_EXT_eye_gaze_interaction` gives the gaze ray, and it meets the calibrated screen plane 60
   times a second (`quest/glance-gaze/gaze.gd`). Build and install steps are in
   [quest/glance-gaze/README.md](quest/glance-gaze/README.md).
