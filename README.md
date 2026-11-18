@@ -1,5 +1,10 @@
 # Glance
 
+> **New: [Glance VR](vr/README.md)** puts your Mac's windows around you as floating panels on Meta Quest. Look at a
+> window, pinch to click, point to scroll, grab to move. No controller, mouse or keyboard. Built for the Meta VR Start
+> Developer Competition 2026. [Demo video](https://www.youtube.com/watch?v=RoXALA7M2vg) ·
+> [Setup](vr/README.md#quick-start) · [Devpost](https://devpost.com/software/glance-vr)
+
 **Point at it. Say it.** Glance is a macOS assistant built on Meta's Muse models, for people who work with AI all day
 across many windows: coding agents in four terminals, a browser, a design file.
 
@@ -269,6 +274,19 @@ The tests cover:
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the brain's tests, the replayed evals and the app's tests
 on every push.
 
+## Glance VR (Meta Quest): your Mac's windows as floating panels
+
+Every open Mac window becomes its own floating panel in a Meta Quest. Look at a panel to select it. Then use your
+hands: a short left pinch clicks, two quick pinches open, pointing your index finger scrolls, a right pinch grabs and
+moves a panel, and pinching with both hands zooms. Every action lands in that exact Mac window, by window ID.
+
+**Quick start:**
+1. Run `swift run -c release Glance` here. No API key is needed for Glance VR.
+2. Install `GlanceVR.apk` from Releases (or build it from `vr/`) with `cd vr && zsh cable.sh install`.
+3. Open Glance VR in the headset.
+
+Full instructions, gestures and the build: [vr/README.md](vr/README.md).
+
 ## Glance Gaze (Meta Quest Pro)
 
 Glance follows the pointer, so anything that moves the pointer can aim it. Glance Gaze ([quest/](quest/glance-gaze/README.md))
@@ -327,6 +345,7 @@ in `~/MetaAICompetition/demo-shop`, which is not in this repo.
 | `figma-plugin/` | Glance Bridge, the Figma plugin that reads and changes layers for the brain |
 | `Tests/GlanceTests/` | The app's tests and its live terminal evals |
 | `quest/` | Glance Gaze, the Quest Pro eye-gaze app |
+| `vr/` | Glance VR, the Quest app with one floating panel per Mac window (Godot), and its build, install and packaging scripts |
 | `Sources/GazeTest/` | The webcam gaze experiment |
 | `demo/` | The demo video's scripts, scenes and Remotion project |
 
