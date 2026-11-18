@@ -38,3 +38,11 @@ vr/headset/android/
 # Demo-video production files and the video itself stay on disk only; the video is on YouTube
 demo/
 docs/glance-demo.mp4
+
+# Parts not used by Glance VR (Figma brain and plugin, demo media) stay on disk only
+brain/
+figma-plugin/
+docs/demo-poster.jpg
+docs/figma.gif
+docs/terminals.gif
+vr/PROJECT.md

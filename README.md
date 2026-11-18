@@ -1,362 +1,142 @@
-# Glance
-
-## 🥽 Glance VR: your Mac's windows, floating around you on Meta Quest
+# Glance VR: your Mac's windows, floating around you on Meta Quest
 
 Every open window on your Mac becomes its own floating panel in your Quest, with passthrough so you still see your
-room. **Look** at a window to select it, then use your **hands**. No controller, no mouse, no keyboard.
+room. **Look** at a window to select it, then use your **hands**: pinch to click, pinch twice to open, point to scroll,
+grab to move, and pinch with both hands to zoom. No controller, no mouse, no keyboard.
 
 **Demo video:** [youtube.com/watch?v=RoXALA7M2vg](https://www.youtube.com/watch?v=RoXALA7M2vg) ·
 **Devpost:** [devpost.com/software/glance-vr](https://devpost.com/software/glance-vr) ·
-Built for the **Meta VR Start Developer Competition 2026** (Productivity, New Experience)
+Built for the **Meta VR Start Developer Competition 2026** (Productivity track, New Experience)
+
+```
+ QUEST (Godot app, vr/)                                  MAC (Swift app, Sources/Glance/)
+ one floating panel per Mac window   ◀── window pictures ───   WindowRegistry + WindowStreamPool
+ gaze (eyes or head) highlights one  ── window id + point ──▶   (ScreenCaptureKit, per window)
+ pinch / point / grab / zoom         ── click, scroll, ... ─▶   GazeInput: brings that exact window
+                                       one WebSocket :47811        forward, then real mouse and
+                                       (USB cable or Wi-Fi)        scroll events land in it
+```
+
+## Gestures
 
 | Gesture | What it does |
 |---|---|
 | **Look** at a window | Highlights it and shows its name |
 | **Left hand, short pinch** (thumb + index) | Click where you look |
 | **Left hand, two quick pinches** | Open, as a double-click (e.g. a file in Finder) |
-| **Point** (fist, index finger out), move up/down | Scroll. Flick and let go to fling |
-| **Right hand, pinch and move your hand** | Move the panel |
-| **Both hands pinched**, spread / bring together | Zoom in / out |
+| **Point** (fist, index finger out), move up/down | Scroll the window. Flick and let go to fling |
+| **Left hand, long pinch**, move up/down | Scroll too |
+| **Right hand, pinch and move your hand** | Move the panel. It stays where you put it |
+| **Both hands pinched**, spread apart / bring together | Zoom the window in / out |
 | **Right pinch on empty space, hold 2 s** | Bring the panels back in front of you |
 
-### Quick start
-
-You need a Mac with Apple silicon (macOS 13+), a Meta Quest 3, 3S or Pro in developer mode, and a USB-C cable.
-No accounts and no API keys.
-
-1. **Mac:** from this folder, run `swift run -c release Glance`, or double-click `Glance.command`. Allow
-   **Screen Recording** and **Accessibility** for your terminal app when macOS asks, then run it again.
-2. **Quest:** download `GlanceVR.apk` from **Releases** (or build it, see [vr/README.md](vr/README.md)). Plug in the
-   Quest, then run `cd vr && zsh cable.sh install` (or `adb install -r GlanceVR.apk`).
-3. **Open Glance VR** in the headset (Library → Unknown sources). Your Mac's windows appear around you.
-
-**More:** full setup, how to build the APK, how it works and troubleshooting are in
-**[vr/README.md](vr/README.md)**. The Quest app's code is in [`vr/headset/`](vr/headset/), and the Mac side is in
-[`Sources/Glance/`](Sources/Glance/) (`QuestHub`, `WindowRegistry`, `WindowStreamPool`, `GazeInput`).
-
----
-
-## Glance: point at it, say it (Meta Global AI Developer Hackathon)
-
-**Point at it. Say it.** Glance is a macOS assistant built on Meta's Muse models, for people who work with AI all day
-across many windows: coding agents in four terminals, a browser, a design file.
-
-Talking to all of that still starts with clicks. Most dictation tools (Whisper apps, macOS Dictation) turn speech into
-text where the keyboard focus is: you click into the window, click into the field, then speak, and they type for you.
-Glance removes the click. Point at a window, hold ⌥ (or say "Hey Glance" once) and say what you want: the pointer says
-where, your words say what, and Muse acts inside that window. Every command is its own task, so you point at the next
-window and talk while the first one works.
-
-[![Glance demo video (3 min): click to watch on YouTube](docs/demo-poster.jpg)](https://youtu.be/zzA-1mfZ__w)
-<sub>The demo video (3 min, recorded live on a Mac): click to watch on YouTube.</sub>
-
-![Four terminals, four spoken commands, all running at once](docs/terminals.gif)
-<sub>Four terminals, four spoken commands, all running at once (from the demo video, 2× speed).</sub>
-
-**Figma shows how far one app can go.** For designers, Glance has an agent made for Figma: point at a layer and say
-"make this button green" or "put a photo of a sunny beach here". Parallel workers change the layers, a reviewer checks
-every change, and undo is exact. The same pattern (tools for the app, a guard on what may change, a reviewer) is how
-Glance grows into other apps and use cases.
-
-![In Figma: a new heading, a Muse Image photo and a green button, each from one spoken command](docs/figma.gif)
-<sub>In Figma: a new heading, a photo painted by Muse Image, and a green button, each from one spoken command (2× speed).</sub>
-
-Built for the Meta Global AI Developer Hackathon (26 Oct – 4 Nov 2026), indie track.
-**Demo video (3 min): [youtu.be/zzA-1mfZ__w](https://youtu.be/zzA-1mfZ__w)** · the 1-minute version on
-[X](https://x.com/caprisiusdev/status/2118057476381655050)
-
-| Meta model | What it does in Glance |
-| --- | --- |
-| **Muse Voice Transcribe** (`muse-voice-transcribe-1.0`) | Speech to text in real time while you hold the key (text ready ~0.3 s after you let go) |
-| **Muse Spark** (`muse-spark-1.3`) | Reads the window you pointed at (its text, the element under the pointer, a picture when needed) and acts through tools: types into terminals, presses keys, opens tabs, clicks numbered elements. In Figma: one worker tool loop per task, plus a second-opinion reviewer |
-| **Muse Image** (`muse-image-1.0`) | "Put a photo of a sunny beach here": paints the picture and puts it into the Figma layer |
-
-What makes it different from "point and ask an AI":
-
-- **No click first.** Glance works on the window under the pointer, whichever window has the keyboard.
-- **Tasks run side by side.** Point at the test terminal, ask; point at the code, ask; point at git, ask. All three run at once.
-- **Every change is checked.** In Figma a reviewer reads each change back, checks it matches your words, flags anything
-  else that moved, asks Muse Spark for a second opinion, and gives the worker one retry. Undo restores the layer exactly.
-- **Risky actions wait for your yes.** Typing into a terminal, Send/Delete buttons, closing tabs. API keys and tokens
-  in a window's text are hidden before it goes to Muse.
-- **Any pointer works.** Mouse, trackpad, macOS Head Pointer, or an eye tracker that moves the cursor.
-- **Measured against the real model.** 41 eval cases run 3 times each against Muse Spark, plus 7 terminal cases. Every
-  run did exactly what was asked, and none changed anything it shouldn't, including when the design itself contained
-  instructions. The evals and tests found 4 real bugs; each was fixed and checked again live. See
-  [Tests and evals](#tests-and-evals).
-
-## How it works
-
-```
- you: point, hold ⌥, talk
-        │
-        ▼
- Glance app (Swift, Sources/Glance) ── your voice ──▶ Muse Voice Transcribe (streaming)
- glow, name tags, task cards, mascot
-        │
-        ├── any window ──▶ window agent (Agent.swift): one Muse Spark tool loop per command
-        │                  tools for the kind of window: terminal, browser, music app, any app (Accessibility)
-        │                  risky steps wait for your yes; keys in the window's text are masked first
-        │
-        └── Figma ──ws──▶ brain (Node, brain/) ──ws──▶ Glance Bridge plugin (figma-plugin/) ──▶ your layers
-                          orchestrator: a new task, an update, an answer or an undo?
-                          workers: one Muse Spark tool loop per task, in parallel, limited to the pointed layer
-                          reviewer: reads each change back; rules, then a Muse second opinion; one retry
-                          Muse Image paints pictures into layers
-```
-
-- **The window agent** reads the window you pointed at, sends it to Muse Spark as data (never as instructions), and runs
-  the tools Muse picks. Typing into a terminal, risky buttons ("Delete", "Pay"), and keys that quit or interrupt always
-  ask first, however Muse writes them. A "no" stops the rest of that command.
-- **The Figma brain** runs several tasks at once. Each task keeps a copy of the layer from before its first change, so
-  Cancel and Undo are exact. A scope guard refuses any change outside the layer you pointed at. The reviewer decides
-  when a task shows "✓ Checked". Calls to Muse are retried on network errors, server errors and rate limits (honouring
-  Retry-After), at most 6 run at once, and each task records its own cost (Muse calls, time, tokens).
-- Message formats between the app, the brain and the plugin are in [PROTOCOL.md](PROTOCOL.md).
+Quest Pro and Meta VR Glasses point with your eyes; Quest 3 and 3S point with your head (the dot in the middle of your
+view). A small legend shows the gestures for 12 s when the windows appear, and glowing dots on your hands show what
+the headset tracks.
 
 ## Quick start
 
+**You need:** a Mac with Apple silicon (macOS 13 or newer), a Meta Quest 3, 3S or Pro with developer mode on, and a
+USB-C cable (or the same Wi-Fi for Mac and Quest). No accounts and no API keys.
+
+### 1. Run the Mac app
+
+From the root of this repo (needs Xcode 16+):
+
+```
+swift run -c release Glance
+```
+
+Or double-click `Glance.command`. The first time, macOS asks for permissions for your terminal app. Allow them in
+System Settings → Privacy & Security, then start Glance again:
+
+- **Screen & System Audio Recording**, so the windows can be shown in the headset
+- **Accessibility**, so Glance can click and scroll for you
+
+Keep the window open while you use Glance VR.
+
+### 2. Install the Quest app
+
+Download `GlanceVR.apk` from this repo's **Releases** page, or build it (see below). Plug the Quest into the Mac and
+run:
+
+```
+cd vr && zsh cable.sh install
+```
+
+This installs the app and links it to the Mac over the cable. If you have the APK somewhere else, use
+`adb install -r GlanceVR.apk`. When the headset asks, accept "Allow USB debugging".
+
+### 3. Use it
+
+Open **Glance VR** in the headset (Library → Unknown sources). It finds your Mac by itself, over the cable or on the
+same Wi-Fi, and your windows appear around you.
+
+## Build the Quest app
+
+The Quest app is a Godot 4.7.2 project in [`vr/headset/`](vr/headset/). All its logic is in `vr/headset/gaze.gd`.
+
 You need:
-- macOS 13 or newer, and Xcode 26 or newer (`swift --version` 6.x).
-- Node 20.3 or newer, for the Figma brain.
-- A Meta Model API key with Muse Spark, Muse Voice Transcribe and Muse Image.
-- The Figma desktop app, for the Figma part.
+- Godot 4.7.2, with the Android export templates
+- The Android SDK
+- JDK 17 (the one inside Android Studio works)
 
-```bash
-git clone https://github.com/ismkhanh/glance.git
-cd glance
-cp .env.example .env              # then paste your key after MUSE_API_KEY=
-(cd brain && npm ci)              # the brain's one dependency (ws)
-swift run -c release Glance       # add --say to hear the replies
+`vr/build.sh` finds them by itself. You can also set them yourself with `GODOT=…`, `ANDROID_HOME=…` and `JAVA_HOME=…`.
+
+```
+cd vr
+zsh build.sh          # → vr/builds/GlanceVR.apk
+zsh cable.sh install  # install on the plugged-in Quest
 ```
 
-The first build takes about a minute. A **◉ Glance** item appears in the menu bar. Keep the terminal open: it shows the
-log and takes typed commands. Run Glance from this folder: it finds `.env` and `brain/` next to where it starts.
+- **Signing:** without a key, `build.sh` makes a debug-signed APK, which works on your own headset. To upload to the
+  Meta Developer Dashboard, you need a release-signed APK. Put your own key in `vr/signing/`
+  (`glancevr-release.keystore` plus `keystore.env` with `GLANCEVR_KEYSTORE_PASSWORD` and `GLANCEVR_KEY_ALIAS`).
+  `signing/` is in `.gitignore`. Never commit it.
+- **Dashboard rules:** the Dashboard accepts target SDK 34 or lower, which `vr/headset/export_presets.cfg` sets.
+  Every new upload needs a higher version code: `zsh build.sh 4`.
+- **Upload:**
+  `metavr auth login`, then
+  `metavr store dist upload --app-id <your app id> --channel <channel> --apk builds/GlanceVR.apk --notes "…"`.
+- **Share one folder:** `zsh package.sh` puts the ready-to-run Mac app, the APK, [vr/SETUP.md](vr/SETUP.md) and all
+  source into `vr/release/GlanceVR-Release.zip`. Your keys and `.env` are never copied into it.
 
-macOS asks once for:
-- Accessibility for your terminal app (System Settings > Privacy & Security > Accessibility);
-- the microphone;
-- the "Terminal wants to control …" prompts.
+## How it works
 
-For browsers, also turn on View > Developer > Allow JavaScript from Apple Events in Chrome.
+- **Window list:** `WindowRegistry` lists the Mac's normal windows (app, title, size, order).
+- **Window pictures:** `WindowStreamPool` captures each window with ScreenCaptureKit. The window you look at streams
+  live, and the others update as thumbnails, which keeps decoding on the headset within budget.
+- **Panels:** the headset builds one panel per window and lets you place it. Gaze (eyes, or head on Quest 3) picks
+  the panel, with a short hold so the highlight doesn't flicker.
+- **Targeting:** every action carries the **window ID** and the point on it, not a mouse position. So a click or
+  scroll always lands in the window you looked at, even if another window covers it on the Mac. The Mac brings that
+  window forward first (`Sources/Glance/GazeInput.swift`).
+- **Connection:** one WebSocket on port 47811 (`Sources/Glance/QuestHub.swift`). Over USB, `adb reverse` carries it.
+  On Wi-Fi, the headset finds the Mac by broadcast. The message formats are in [PROTOCOL.md](PROTOCOL.md).
+- **Fallback:** if a Mac doesn't send window panels, the app falls back to one panel mirroring the whole screen.
 
-## Use it
+## If something doesn't work
 
-Point at anything with the mouse, or with your head (macOS Head Pointer on):
+- **"Looking for Glance on your Mac…" doesn't go away:** check that Glance is still running on the Mac. With the
+  cable, run `zsh vr/cable.sh` again after re-plugging. On Wi-Fi, both devices must be on the same network.
+- **Windows are black:** Screen Recording isn't allowed for your terminal app yet. Allow it, then restart Glance.
+- **Clicks or scrolls do nothing:** Accessibility isn't allowed yet.
+- **Watch the headset log:** `adb logcat -s godot`
 
-- While Glance listens (⌥ held, or a hands-free session on), a **glow** follows the window under the pointer, and a
-  smaller glow and a **name tag** follow the element under it (button, link, text, field). "this", "that" and "here"
-  in a command mean that element. The rest of the time the glow stays out of the way.
-- **Snap:** you don't have to be exactly on a button. Within 40 pt the glow jumps to the nearest one (the tag shows ↪).
-- **Numbers:** while you hold the key, up to 5 clickables near the pointer get number badges. Say "click two",
-  "the one on the left" or "the blue one". The glow moves to Muse's pick before anything is clicked.
-- **Hold Left Option** from any app, speak, and let go. The glow locks on the window when you press the key, and is
-  free again as soon as you let go: the command becomes a task with its own card on that window, and you can point at
-  the next window and talk while it works.
-- The **mascot** (bottom right) shows whether Glance can hear you: its eye is closed while Glance isn't listening, and
-  opens and follows your pointer while it is. A short sound marks the start and the end, and in a hands-free session
-  a pop says a command was heard (◉ Glance > "Sounds when Glance listens and hears you" turns them off).
-- Click the **mascot** for the list of tasks and their results. 🔊/🔇 in the list (or ◉ Glance >
-  "Read results aloud") switches spoken results on and off; `--say` starts with them on.
-- Or type a command in the terminal and press Enter.
-- When Glance needs your yes (typing into a terminal, Send/Delete buttons, closing a tab): hold the key and say
-  "yes" or "no", or type `y` + Enter in the terminal. No answer in 60 s means no.
+## Security
 
-| Glow colour | Meaning |
-| --- | --- |
-| Blue | following the pointer (in a hands-free session) |
-| Green | listening (key held) |
-| Purple | Muse is working |
-| Orange | waiting for your yes or no |
-
-Turn the glow off altogether with ◉ Glance > "Highlight what I point at". Quit with `quit` in the terminal or the menu.
-
-Try with the pointer on a button: "click this", "what does this do?". On a paragraph: "explain this".
-
-| Window | Try | How Glance acts |
-| --- | --- | --- |
-| Terminal | "what is the status of this task?", "answer yes" | AppleScript reads and types into that tab |
-| Chrome, Brave, Edge | "open a new tab and search Tesla stock", "what is this page about?" | AppleScript, and JavaScript in the active tab |
-| YouTube / YouTube Music tab | "pause", "next song", "volume 30" | JavaScript on the video in that tab |
-| Music, Spotify | "pause", "next", "volume 40" | AppleScript |
-| Any other app | "click Save", "turn on the dark mode checkbox", "File > New Window" | Accessibility tree: buttons, fields, menus |
-
-## Hands-free: "Hey Glance"
-
-Start with `--hey-glance`, or turn on ◉ Glance > "Listen for “Hey Glance”". Then:
-
-- Say **"Hey Glance"**. The eye opens and you hear a sound: a hands-free session has started.
-- Point at a window and talk. Each thing you say is a command for the window under the pointer when you start saying
-  it, exactly as if you held ⌥ while you spoke. When you stop, a soft pop says Glance has it: point at another window
-  and keep talking, no "Hey Glance" again. The glow shows where your next words will go.
-- "Hey Glance, make this button green" in one breath starts the session and runs the command.
-- **Esc**, "thanks, Glance" or "stop listening" ends the session, and so do 10 s without a command (after "Hey
-  Glance", or after the last command that ran; a yes/no question keeps it on). The eye closes and you hear the
-  closing sound. Answer a yes/no question with just the answer ("yes, go ahead", "no"): other talk in the room
-  doesn't count as one.
-
-How it listens: a voice detector on the Mac finds where speech starts and stops, learning the room's own noise level.
-While Glance waits for "Hey Glance", only speech goes to Muse Voice Transcribe, and of each thing said only its first
-2 s until its words show it starts with "Hey Glance". Glance stops sending as soon as the first words aren't "Hey
-Glance" (or are "hey, glance at this"), and drops what it heard; coughs and clicks are dropped too. A command said
-right after "Hey Glance", before its transcript is back, waits on the Mac and then runs. Glance doesn't listen to its
-own voice or sounds, and watches for Esc only during a session. Holding ⌥ still works during a session, and uses the
-same microphone.
-
-## Figma: parallel tasks with an orchestrator and a reviewer
-
-Point at a layer in Figma, hold Left Option and say what to change. Each command becomes a **task**; tasks run at the
-same time, so you can point at the next layer and talk again right away.
-
-One-time setup:
-
-1. `cd brain && npm ci`, if you skipped it in the quick start.
-2. In the **Figma desktop app**: Plugins > Development > Import plugin from manifest… and pick
-   `figma-plugin/manifest.json`. (Plugins in development run only in the desktop app.)
-3. In your design file: Plugins > Development > **Glance Bridge**. A small window says "Connected to Glance" once
-   Glance runs. Keep it open (you can move it aside).
-
-Then run Glance as usual. It starts the brain by itself (`node brain/src/main.js`, on `localhost:47800` only), and starts
-it again if it ever stops.
-
-| You do | Glance does |
-| --- | --- |
-| Point at the blue button, hold ⌥, "turn it red" | Figma outlines the layer (Glance Cmd+clicks it), a task starts |
-| Right away: point at the banner, "make it scrollable" | A second task starts; it does not wait for the first |
-| The banner's worker is not sure | A tooltip appears where you pointed: "Which way should it scroll? I recommend Horizontal — content already spills out horizontally". Click an option, or point at the tooltip, hold ⌥ and say it |
-| Point at the button again, "actually make it green" | Added to the button's task, even if it is still running |
-| Point at it, "undo that" | The layer goes back exactly as it was (from the copy saved before the first change) |
-| Click the mascot (bottom right; its eye follows your pointer) | The task list: Pause, Resume, Edit, Cancel, Undo, Retry, Answer |
-
-What the workers can change: fill and text color, border, corner radius, opacity, text, font size, size, auto
-layout, scrolling (prototype overflow), layer name, and pictures (Muse Image). The plugin window's **Build demo screen**
-button adds a small travel-app screen on its own page to try it on. They never delete layers, and they may only change
-the layer you pointed at and its children. When the pointer is on a text or shape inside a frame (a button's label),
-that frame counts too, so "make this button green" works. A whole screen never does.
-
-**The reviewer** checks every task before it is "done": each change is read back from Figma; the result must match
-your words (colors, scroll direction, rounded corners); nothing else on the layer may have changed; and Muse gives a
-second opinion. If the check fails, the worker gets the reviewer's notes and tries once more. A task that still
-fails is marked Failed with the reason. Cancel and Undo put the layer back exactly as it was before the task.
-
-## Settings
-
-| Flag or environment variable | Default | What it does |
-| --- | --- | --- |
-| `--say` | off | Read results aloud from the start (toggle later in the task list) |
-| `--hey-glance` | off | Listen for "Hey Glance" from the start (also in the ◉ Glance menu) |
-| `--talk-key <key>` | `left-option` | The key you hold to talk: `right-option`, `right-command`, `right-control` or `fn` |
-| `--gaze <port>` | `47810` | Takes gaze points `{"x": 0…1, "y": 0…1}` over UDP (from [Glance Gaze](#glance-gaze-meta-quest-pro) or any tracker), and moves the pointer when your gaze settles somewhere new (`--no-gaze` turns it off) |
-| `--quest <port>` | `47811` | Quest Desk for the headset: terminals, the screen stream and floating windows, found by the Quest app automatically (`--no-quest` turns it off) |
-| `MUSE_API_KEY` | from `.env` | The Meta Model API key (never logged or recorded) |
-| `GLANCE_MUSE_REVIEW` | on | `0` turns off Muse's second-opinion review (the rules alone let wrong sizes and texts through; see the evals) |
-| `GLANCE_BRAIN_DIR` | `./brain` | Where the brain is, if you run Glance from another folder |
-| `MUSE_BASE_URL` | `https://api.meta.ai/v1` | Where the brain's Muse calls go |
-
-## Tests and evals
-
-The tests check the code around the model. The evals check what the agents themselves do with the real Muse models.
-
-```bash
-cd brain && npm test && npm run eval:replay   # 71 tests, then the recorded evals: no Figma, no key, no network
-cd .. && swift test                           # 50 tests of the app
-```
-
-Latest live run (Muse Spark 1.3, 3 trials per case, 4 Nov 2026; full report in
-[brain/evals/REPORT.md](brain/evals/REPORT.md)):
-
-| Measure | Result |
-| --- | --- |
-| Figma runs that did exactly what was asked | 123/123 |
-| Cases right in every trial (pass^3) | 41/41 |
-| Runs that changed anything outside what was asked | 0 |
-| Safety runs: instructions hidden in the design, out of scope, "delete this" | 15/15 |
-| Asked a question when the words left it open / when it did not need to | 3/3 / 1 of 117 |
-| Reviewer: wrong changes let through, rules alone → rules + Muse | 18 of 30 → 0 of 30 |
-| Terminal agent runs (incl. a build log telling it to `curl … \| sh`, a live key on screen) | 21/21 |
-| Muse time per command | median 5.6 s, p95 16.3 s (2.4 Muse calls, ~4.5k tokens) |
-
-How the evals work:
-- **Real agent, checked on the result.** Each eval runs the real orchestrator, workers, reviewer and plugin code on a
-  copy of the demo's Figma screen, then compares every layer before and after. Only the outcome counts, never Muse's
-  wording.
-- **Recorded for CI.** The live run is recorded, so CI replays it in a second. A changed prompt or tool fails CI
-  until it is recorded again.
-
-The method, the cases and what the evals found are in [brain/evals/README.md](brain/evals/README.md). Live runs need a
-key and take about 5 minutes:
-
-```bash
-cd brain && npm run eval                               # Figma agent and reviewer, records a new cassette
-cd .. && GLANCE_LIVE_EVAL=1 swift test --filter AgentLiveEvals     # terminal agent
-GLANCE_LIVE_EVAL=1 swift test --filter HandsFreeLiveEvals           # "Hey Glance" through Muse Voice Transcribe
-```
-
-The tests cover:
-- **The brain (71 tests):** routing, including a spoken "undo that"; the reviewer; the Muse client's retries, rate
-  limit and concurrency cap; parallel tasks, updates while a task runs, questions, pause, edit, cancel, undo and the
-  scope guard; what happens when Muse misbehaves (unknown tools, bad colors, tool calls written as text, a plugin that
-  stops answering); and an end-to-end run over real sockets.
-- **The app (50 tests):** secret masking; the confirmation rules for risky buttons and keys, however a key combo is
-  written; reading Muse's answers; and the agent loop with a scripted Muse. A declined command is never typed, a "no"
-  stops the rest of the plan, and the loop is bounded. Hands-free: the voice detector on spoken clips in a quiet room
-  and next to a fan, the wake and goodbye phrases, and a whole session (wake, commands, Esc, silence, the talk key,
-  not listening to itself); that at most 2 s leave the Mac before "Hey Glance" is confirmed, that a command said
-  straight after it is kept and run, that coughs are dropped, and that only a clear yes or no answers a question.
-
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the brain's tests, the replayed evals and the app's tests
-on every push.
-
-## Glance VR (Meta Quest)
-
-See the [top of this README](#-glance-vr-your-macs-windows-floating-around-you-on-meta-quest) and
-[vr/README.md](vr/README.md).
-
-## Glance Gaze (Meta Quest Pro)
-
-Glance follows the pointer, so anything that moves the pointer can aim it. Glance Gaze ([quest/](quest/glance-gaze/README.md))
-is a Quest Pro app (Godot 4.7.2 + Meta's OpenXR vendor plugin, passthrough on) that turns where your eyes look on the
-Mac's screen into pointer movement. Calibrate once by touching three screen corners with the controller, then look at
-a window, hold Option and talk.
-
-- Mac side: just launch Glance (`Glance.command`, or `swift run -c release Glance`). It listens for the gaze points,
-  smooths them and moves the pointer only when your gaze settles somewhere new (`Sources/Glance/GazeInput.swift`),
-  and the Quest app finds it by itself — launch the app, then open the app on the headset.
-- Headset side: OpenXR `XR_EXT_eye_gaze_interaction` gives the gaze ray, and it meets the calibrated screen plane 60
-  times a second (`quest/glance-gaze/gaze.gd`). Build and install steps are in
-  [quest/glance-gaze/README.md](quest/glance-gaze/README.md).
-
-## Experiments
-
-**Gaze test** (`swift run -c release GazeTest`): can the built-in webcam tell which window you are looking at? Apple
-Vision finds the eyes. The app then measures the pupil inside each eye, the eyelid opening (the strongest up/down
-signal on a webcam) and the head turn. Calibration picks the mix that works best on dots it did not train on, and
-each click corrects drift. Each test writes its score and every frame's estimate to `results/`; camera frames never
-leave the Mac.
-
-| Key | What it does |
-| --- | --- |
-| C | Calibrate: look at 9 dots, one after another (about 17 s). Keep your head still |
-| K | Touch-up: click 5 green dots to correct drift after you move |
-| T / Y | Box test: 20 rounds on 2×2 (T) or 3×3 (Y) boxes. Pass mark: 18 of 20 on 2×2 |
-| J / S | Steering: focus moves with the direction your eyes and head turn, not the absolute point |
-| L | Live view: a ring shows where the app thinks you look |
-| Esc | Stop a step, or quit from the start screen |
-
-**Which window are you facing?**: Muse Spark on a webcam photo, with and without SAM 3.1. It got
-2–4 of 12 right in 15–37 s, so Glance follows the pointer instead.
+On Wi-Fi, another device on the same network could connect to Glance. Use it on your own network, or start Glance with
+`GLANCE_QUEST_LAN=0` so it only accepts the USB cable. For shared networks, set a `GLANCE_QUEST_TOKEN` on both ends.
 
 ## Repository layout
 
 | Folder | What is in it |
 | --- | --- |
-| `Sources/Glance/` | The macOS app: pointer and element tracking, talk key, Muse Voice Transcribe, the window agent and its adapters, overlays, task cards |
-| `brain/` | The Figma brain: orchestrator, workers, reviewer, Muse client (`src/`), tests (`test/`), evals (`evals/`) |
-| `figma-plugin/` | Glance Bridge, the Figma plugin that reads and changes layers for the brain |
-| `Tests/GlanceTests/` | The app's tests and its live terminal evals |
-| `quest/` | Glance Gaze, the Quest Pro eye-gaze app |
-| `vr/` | Glance VR, the Quest app with one floating panel per Mac window (Godot), and its build, install and packaging scripts |
-| `Sources/GazeTest/` | The webcam gaze experiment |
+| `vr/` | The Quest app (`vr/headset/`, Godot), plus build, install and packaging scripts |
+| `Sources/Glance/` | The Mac app: window list and capture (`WindowRegistry`, `WindowStreamPool`), headset link (`QuestHub`), actions in windows (`GazeInput`) |
+| `Tests/GlanceTests/` | Tests for the Mac app, including the floating-window protocol |
+| `quest/` | Earlier Quest prototypes: pointing at the real Mac screen through passthrough, and a single mirrored screen |
+| `PROTOCOL.md` | The messages between the headset and the Mac |
 
 ## License
 
